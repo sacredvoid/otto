@@ -1,0 +1,136 @@
+:root {
+  --ink: #1c2622;
+  --muted: #5b6b65;
+  --line: #e3ebe7;
+  --sky: #cfe6f3;
+  --mint: #8cc9b2;
+  --mint-soft: #ddf1e6;
+  --teal: #2f6f62;
+  --teal-ink: #24594a;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+body {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  max-width: 520px;
+  padding: 0 20px 0 8px;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 8px 28px rgba(28, 38, 34, 0.12);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+.pill[data-state="idle"] {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+}
+.pill[data-state="heard"] {
+  background: var(--mint-soft);
+  border-color: transparent;
+}
+
+.mascot {
+  display: none;
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+.pill[data-state="listening"] .for-listening,
+.pill[data-state="transcribing"] .for-transcribing,
+.pill[data-state="heard"] .for-heard,
+.pill[data-state="miss"] .for-miss {
+  display: block;
+}
+.body {
+  fill: var(--sky);
+}
+.for-heard .body {
+  fill: #bfe5d2;
+}
+.tie {
+  fill: var(--mint);
+  stroke: var(--mint);
+  stroke-width: 6;
+  stroke-linejoin: round;
+}
+
+.wave {
+  display: none;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+}
+.pill[data-state="listening"] .wave {
+  display: flex;
+}
+.wave span {
+  width: 3px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--mint);
+  transition: height 60ms linear;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.pill[data-state="heard"] .label {
+  color: var(--teal-ink);
+}
+.detail {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pill[data-state="heard"] .detail {
+  color: #3a5a4e;
+}
+
+/* Mascot motion (same timings as design/mockups/Mascot.dc.html) */
+.m { transform-box: fill-box; transform-origin: 50% 100%; }
+.listen { animation: listenTilt 3s ease-in-out infinite; }
+.ear { transform-box: fill-box; transform-origin: 100% 60%; animation: earPop 3s ease-in-out infinite; }
+.bob { animation: bob 1.2s ease-in-out infinite; }
+.blink { transform-box: fill-box; transform-origin: center; animation: blink 4s infinite; }
+.hop { animation: hop 1.8s ease-in-out 1; }
+.tilt { animation: tilt 3s ease-in-out infinite; }
+
+@keyframes listenTilt { 0%, 10% { transform: rotate(0); } 28%, 82% { transform: rotate(-9deg); } 100% { transform: rotate(0); } }
+@keyframes earPop { 0%, 10% { transform: scale(0); } 22% { transform: scale(1.2); } 30%, 82% { transform: scale(1); } 94%, 100% { transform: scale(0); } }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3%); } }
+@keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes hop { 0%, 100% { transform: translateY(0) scale(1, 1); } 20% { transform: translateY(0) scale(1.06, 0.92); } 45% { transform: translateY(-12%) scale(0.97, 1.04); } 75% { transform: translateY(0) scale(1.04, 0.96); } }
+@keyframes tilt { 0%, 100% { transform: rotate(9deg); } 50% { transform: rotate(14deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .m, .ear, .blink { animation: none !important; }
+  .pill { transition: none; }
+}

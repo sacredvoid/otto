@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Otto</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <div id="pill" class="pill" data-state="idle" role="status" aria-live="polite">
+      <!-- One mascot per state; CSS shows the one matching data-state. -->
+      <svg class="mascot for-listening" viewBox="-10 -20 120 120" aria-hidden="true">
+        <g class="m listen">
+          <g class="ear">
+            <path d="M20 34 C8 26 -1 42 6 54 C9 59 15 58 18 54 Z" fill="#CFE6F3" stroke="#9CC2E3" stroke-width="2" />
+            <path d="M12 40 Q6 45 11 51" fill="none" stroke="#2F6F62" stroke-width="3" stroke-linecap="round" />
+          </g>
+          <path class="body" d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" />
+          <circle cx="35" cy="45" r="5.5" fill="#2F6F62" />
+          <circle cx="57" cy="45" r="5.5" fill="#2F6F62" />
+          <path class="tie" d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" />
+        </g>
+      </svg>
+      <svg class="mascot for-transcribing" viewBox="-10 -20 120 120" aria-hidden="true">
+        <g class="m bob">
+          <path class="body" d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" />
+          <circle class="blink" cx="76" cy="44" r="5.5" fill="#2F6F62" />
+          <path d="M58 73 L66 78 L58 83 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round" />
+        </g>
+      </svg>
+      <svg class="mascot for-heard" viewBox="-10 -20 120 120" aria-hidden="true">
+        <g class="m hop">
+          <path class="body" d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#BFE5D2" />
+          <path d="M33 47 Q39 39 45 47 M55 47 Q61 39 67 47" fill="none" stroke="#2F6F62" stroke-width="5" stroke-linecap="round" />
+          <path class="tie" d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" />
+        </g>
+      </svg>
+      <svg class="mascot for-miss" viewBox="-10 -20 120 120" aria-hidden="true">
+        <g class="m tilt">
+          <path class="body" d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" />
+          <circle cx="39" cy="45" r="5.5" fill="#2F6F62" />
+          <path d="M56 46 H66" stroke="#2F6F62" stroke-width="5" stroke-linecap="round" />
+          <path class="tie" d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" />
+        </g>
+      </svg>
+
+      <div id="wave" class="wave" aria-hidden="true"></div>
+      <span id="label" class="label"></span>
+      <span id="detail" class="detail"></span>
+    </div>
+  </body>
+</html>
