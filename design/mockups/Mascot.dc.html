@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Otto mascot states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#24594A}a:hover{color:#17332A}
+button{font-family:inherit;cursor:pointer}
+.m{transform-box:fill-box;transform-origin:50% 100%}
+.breathe{animation:breathe 3.6s ease-in-out infinite}
+.bob{animation:bob 1.2s ease-in-out infinite}
+.hop{animation:hop 1.8s ease-in-out infinite}
+.nudge{animation:nudge 2.4s ease-in-out infinite}
+.tilt{animation:tilt 3s ease-in-out infinite}
+.droop{animation:droop 3.2s ease-in-out infinite}
+.look{transform-box:fill-box;transform-origin:center;animation:look 2.6s ease-in-out infinite}
+.ring{transform-box:fill-box;transform-origin:center;animation:ring 1.8s ease-out infinite}
+.ring2{animation-delay:.9s}
+@keyframes breathe{0%,100%{transform:scale(1,1)}50%{transform:scale(1.035,.965)}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3%)}}
+@keyframes hop{0%,55%,100%{transform:translateY(0) scale(1,1)}62%{transform:translateY(0) scale(1.06,.92)}72%{transform:translateY(-12%) scale(.97,1.04)}84%{transform:translateY(0) scale(1.04,.96)}}
+@keyframes nudge{0%,60%,100%{transform:rotate(0)}66%{transform:rotate(-7deg)}74%{transform:rotate(7deg)}82%{transform:rotate(-4deg)}90%{transform:rotate(0)}}
+@keyframes tilt{0%,100%{transform:rotate(9deg)}50%{transform:rotate(14deg)}}
+@keyframes droop{0%,100%{transform:translateY(2%) scale(1.02,.97)}50%{transform:translateY(4%) scale(1.04,.94)}}
+@keyframes look{0%,15%{transform:translate(0,0)}25%,50%{transform:translate(10%,-12%)}60%,85%{transform:translate(-10%,-12%)}100%{transform:translate(0,0)}}
+@keyframes ring{0%{transform:scale(.8);opacity:.7}100%{transform:scale(1.35);opacity:0}}
+.listen{animation:listenTilt 3s ease-in-out infinite}
+.ear{transform-box:fill-box;transform-origin:100% 60%;animation:earPop 3s ease-in-out infinite}
+.wave{opacity:0;animation:wave 3s ease-out infinite}
+.wave2{animation-delay:.25s}
+.blink{transform-box:fill-box;transform-origin:center;animation:blink 4s infinite}
+.qm{transform-box:fill-box;transform-origin:50% 100%;animation:qm 2.4s ease-in-out infinite}
+@keyframes listenTilt{0%,10%{transform:rotate(0)}28%,82%{transform:rotate(-9deg)}100%{transform:rotate(0)}}
+@keyframes earPop{0%,10%{transform:scale(0)}22%{transform:scale(1.2)}30%,82%{transform:scale(1)}94%,100%{transform:scale(0)}}
+@keyframes wave{0%,30%{opacity:0}45%{opacity:1}65%,100%{opacity:0}}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+@keyframes qm{0%,60%,100%{transform:translateY(0)}68%{transform:translateY(-4px)}76%{transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){.listen,.ear,.wave,.blink,.qm{animation:none !important}.wave{opacity:1}}
+\1: reduce){.m,.ring,.look{animation:none !important}}
+</style>
+</helmet>
+<div style="width: 1400px; height: 860px; box-sizing: border-box; padding: 56px; background: #EEF4F1; font-family: 'Geist', system-ui, sans-serif; color: #1C2622; display: flex; flex-direction: column; gap: 48px">
+
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 16px">
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="height: 180px; background: #FFFFFF; border-radius: 18px; display: flex; align-items: center; justify-content: center">
+      <svg width="100" height="100" viewBox="0 0 100 100" role="img" aria-label="Resting: eyes closed, breathing slowly"><g class="m breathe"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"></path><path d="M34 47 H44 M56 47 H66" stroke="#2F6F62" stroke-width="4" stroke-linecap="round"></path><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="5" stroke-linejoin="round"></path><circle cx="50" cy="81" r="3.5" fill="#2F6F62"></circle></g></svg>
+    </div>
+    <span style="font-size: 14px; font-weight: 600">Resting</span>
+    <span style="font-size: 12px; color: #5B6B65">Idle, nothing running</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="height: 180px; background: #FFFFFF; border-radius: 18px; display: flex; align-items: center; justify-content: center">
+      <svg width="120" height="120" viewBox="-10 -20 120 120" role="img" aria-label="Listening: an ear pops out and the head tilts in"><g class="m listen"><g class="ear"><path d="M20 34 C8 26 -1 42 6 54 C9 59 15 58 18 54 Z" fill="#CFE6F3" stroke="#9CC2E3" stroke-width="2"></path><path d="M12 40 Q6 45 11 51" fill="none" stroke="#2F6F62" stroke-width="2.5" stroke-linecap="round"></path></g><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"></path><circle cx="35" cy="45" r="4.5" fill="#2F6F62"></circle><circle cx="57" cy="45" r="4.5" fill="#2F6F62"></circle><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="5" stroke-linejoin="round"></path><circle cx="50" cy="81" r="3.5" fill="#2F6F62"></circle><path class="wave" d="M0 38 Q-5 45 0 52" fill="none" stroke="#9CC2E3" stroke-width="3" stroke-linecap="round"></path><path class="wave wave2" d="M-5 32 Q-11 45 -5 58" fill="none" stroke="#9CC2E3" stroke-width="3" stroke-linecap="round"></path></g></svg>
+    </div>
+    <span style="font-size: 14px; font-weight: 600">Listening</span>
+    <span style="font-size: 12px; color: #5B6B65">Hotkey held</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="height: 180px; background: #FFFFFF; border-radius: 18px; display: flex; align-items: center; justify-content: center">
+      <svg width="120" height="120" viewBox="-10 -20 120 120" role="img" aria-label="Working: turned to the side, focused, blinking"><g class="m bob"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"></path><circle class="blink" cx="76" cy="44" r="4.5" fill="#2F6F62"></circle><path d="M58 73 L66 78 L58 83 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="5" stroke-linejoin="round"></path><circle cx="67" cy="78" r="3.5" fill="#2F6F62"></circle></g></svg>
+    </div>
+    <span style="font-size: 14px; font-weight: 600">Working</span>
+    <span style="font-size: 12px; color: #5B6B65">Tasks running</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="height: 180px; background: #FFFFFF; border-radius: 18px; display: flex; align-items: center; justify-content: center">
+      <svg width="100" height="100" viewBox="0 0 100 100" role="img" aria-label="Done: happy closed eyes, little hop"><g class="m hop"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#BFE5D2"></path><path d="M34 47 Q39 40 44 47" fill="none" stroke="#2F6F62" stroke-width="4" stroke-linecap="round"></path><path d="M56 47 Q61 40 66 47" fill="none" stroke="#2F6F62" stroke-width="4" stroke-linecap="round"></path><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="5" stroke-linejoin="round"></path><circle cx="50" cy="81" r="3.5" fill="#2F6F62"></circle></g></svg>
+    </div>
+    <span style="font-size: 14px; font-weight: 600">Done</span>
+    <span style="font-size: 12px; color: #5B6B65">Task finished</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="height: 180px; background: #FFFFFF; border-radius: 18px; display: flex; align-items: center; justify-content: center">
+      <svg width="120" height="120" viewBox="-10 -20 120 120" role="img" aria-label="Needs you: wide eyes and a question mark"><g class="qm"><path d="M44 -12 Q44 -19 50.5 -19 Q57 -19 57 -13 Q57 -9 51 -6 V-2" fill="none" stroke="#2B5677" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="51" cy="5" r="2.6" fill="#2B5677"></circle></g><g class="m nudge"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"></path><circle cx="39" cy="44" r="6" fill="#1F3E5A"></circle><circle cx="61" cy="44" r="6" fill="#1F3E5A"></circle><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#7FAED6" stroke="#7FAED6" stroke-width="5" stroke-linejoin="round"></path><circle cx="50" cy="81" r="3.5" fill="#2B5677"></circle></g></svg>
+    </div>
+    <span style="font-size: 14px; font-weight: 600">Needs you</span>
+    <span style="font-size: 12px; color: #5B6B65">Waiting for your OK</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="height: 180px; background: #FFFFFF; border-radius: 18px; display: flex; align-items: center; justify-content: center">
+      <svg width="100" height="100" viewBox="0 0 100 100" role="img" aria-label="Didn't catch that: head tilted, one eye squinting"><g class="m tilt"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"></path><circle cx="39" cy="45" r="4.5" fill="#2F6F62"></circle><path d="M56 46 H66" stroke="#2F6F62" stroke-width="4" stroke-linecap="round"></path><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="5" stroke-linejoin="round"></path><circle cx="50" cy="81" r="3.5" fill="#2F6F62"></circle></g></svg>
+    </div>
+    <span style="font-size: 14px; font-weight: 600">Huh?</span>
+    <span style="font-size: 12px; color: #5B6B65">Didn't catch that</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 10px">
+    <div style="height: 180px; background: #FFFFFF; border-radius: 18px; display: flex; align-items: center; justify-content: center">
+      <svg width="100" height="100" viewBox="0 0 100 100" role="img" aria-label="Stuck: crosses for eyes, slumping a little"><g class="m droop"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#E4ECE8"></path><path d="M35 41 L43 49 M43 41 L35 49 M57 41 L65 49 M65 41 L57 49" stroke="#5B6B65" stroke-width="4" stroke-linecap="round"></path><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#E3A29C" stroke="#E3A29C" stroke-width="5" stroke-linejoin="round"></path><circle cx="50" cy="81" r="3.5" fill="#8A3B36"></circle></g></svg>
+    </div>
+    <span style="font-size: 14px; font-weight: 600">Stuck</span>
+    <span style="font-size: 12px; color: #5B6B65">Task failed</span>
+  </div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 20px">
+  <span style="font-size: 13px; color: #5B6B65">Where it shows up</span>
+  <div style="display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap">
+
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 20px 0 10px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E3EBE7; border-radius: 999px">
+        <svg width="44" height="44" viewBox="-10 -20 120 120" aria-hidden="true"><g class="m listen"><g class="ear"><path d="M20 34 C8 26 -1 42 6 54 C9 59 15 58 18 54 Z" fill="#CFE6F3" stroke="#9CC2E3" stroke-width="2"></path><path d="M12 40 Q6 45 11 51" fill="none" stroke="#2F6F62" stroke-width="2.5" stroke-linecap="round"></path></g><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"></path><circle cx="35" cy="45" r="4.5" fill="#2F6F62"></circle><circle cx="57" cy="45" r="4.5" fill="#2F6F62"></circle><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="5" stroke-linejoin="round"></path><circle cx="50" cy="81" r="3.5" fill="#2F6F62"></circle></g></svg>
+        <div style="display: flex; align-items: center; gap: 3px; height: 22px">
+          <span style="width: 3px; height: 6px; border-radius: 2px; background: #8CC9B2"></span>
+          <span style="width: 3px; height: 14px; border-radius: 2px; background: #8CC9B2"></span>
+          <span style="width: 3px; height: 20px; border-radius: 2px; background: #8CC9B2"></span>
+          <span style="width: 3px; height: 10px; border-radius: 2px; background: #8CC9B2"></span>
+          <span style="width: 3px; height: 16px; border-radius: 2px; background: #8CC9B2"></span>
+          <span style="width: 3px; height: 8px; border-radius: 2px; background: #8CC9B2"></span>
+          <span style="width: 3px; height: 4px; border-radius: 2px; background: #8CC9B2"></span>
+        </div>
+        <span style="font-size: 14px; font-weight: 500">Listening</span>
+      </div>
+      <span style="font-size: 12px; color: #5B6B65">Pill: listening</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px 0 8px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E3EBE7; border-radius: 999px">
+        <svg width="30" height="30" viewBox="-10 -20 120 120" aria-hidden="true"><g class="m bob"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"></path><circle class="blink" cx="76" cy="44" r="4.5" fill="#2F6F62"></circle><path d="M58 73 L66 78 L58 83 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="5" stroke-linejoin="round"></path><circle cx="67" cy="78" r="3.5" fill="#2F6F62"></circle></g></svg>
+        <span style="font-size: 13px; font-weight: 500">2 running</span>
+        <span style="width: 1px; height: 14px; background: #E3EBE7"></span>
+        <span style="font-size: 13px; font-weight: 500; color: #2B5677">1 needs you</span>
+      </div>
+      <span style="font-size: 12px; color: #5B6B65">Chip: working (mirrors the busiest state)</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; width: 300px">
+      <div style="background: #FFFFFF; border: 1px solid #E3EBE7; border-radius: 14px; padding: 14px 16px; display: flex; gap: 12px">
+        <svg width="32" height="32" viewBox="0 0 100 100" aria-hidden="true" style="flex: none"><g class="m hop"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#BFE5D2"></path><path d="M33 47 Q39 39 45 47" fill="none" stroke="#2F6F62" stroke-width="5" stroke-linecap="round"></path><path d="M55 47 Q61 39 67 47" fill="none" stroke="#2F6F62" stroke-width="5" stroke-linecap="round"></path><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="5" stroke-linejoin="round"></path></g></svg>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 14px; font-weight: 600">Deck ready</span>
+          <span style="font-size: 13px; color: #5B6B65">Q3 hiring, 5 slides</span>
+          <div style="display: flex; gap: 16px; margin-top: 4px">
+            <button style="padding: 0; border: 0; background: transparent; color: #24594A; font-size: 13px; font-weight: 600">Open</button>
+            <button style="padding: 0; border: 0; background: transparent; color: #5B6B65; font-size: 13px; font-weight: 500">Show in Finder</button>
+          </div>
+        </div>
+      </div>
+      <span style="font-size: 12px; color: #5B6B65">Toast: done (one hop, then still)</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; width: 300px">
+      <div style="background: #F5F9FD; border: 1px solid #CFE0EF; border-radius: 14px; padding: 14px 16px; display: flex; gap: 12px">
+        <svg style="flex: none" width="38" height="38" viewBox="-10 -20 120 120" aria-hidden="true"><g class="qm"><path d="M44 -12 Q44 -19 50.5 -19 Q57 -19 57 -13 Q57 -9 51 -6 V-2" fill="none" stroke="#2B5677" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="51" cy="5" r="2.6" fill="#2B5677"></circle></g><g class="m nudge"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"></path><circle cx="39" cy="44" r="6.5" fill="#1F3E5A"></circle><circle cx="61" cy="44" r="6.5" fill="#1F3E5A"></circle><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#7FAED6" stroke="#7FAED6" stroke-width="5" stroke-linejoin="round"></path><circle cx="50" cy="81" r="3.5" fill="#2B5677"></circle></g></svg>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 14px; font-weight: 600">Okay to send?</span>
+          <span style="font-size: 13px; color: #3A4A44">Email to jon.smith@acme.com</span>
+          <div style="display: flex; gap: 12px; align-items: center; margin-top: 4px">
+            <button style="height: 30px; padding: 0 14px; border-radius: 8px; border: 0; background: #2B5677; color: #FFFFFF; font-size: 13px; font-weight: 500">Send</button>
+            <button style="padding: 0; border: 0; background: transparent; color: #5B6B65; font-size: 13px; font-weight: 500">Don't send</button>
+          </div>
+        </div>
+      </div>
+      <span style="font-size: 12px; color: #5B6B65">Toast: needs you (wiggles every few seconds)</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="width: 96px; height: 96px; border-radius: 22px; background: #DDF1E6; display: flex; align-items: center; justify-content: center">
+        <svg width="70" height="70" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#9CC2E3"></path><path d="M34 46 Q39 40 44 46" fill="none" stroke="#1C2622" stroke-width="5" stroke-linecap="round"></path><path d="M56 46 Q61 40 66 46" fill="none" stroke="#1C2622" stroke-width="5" stroke-linecap="round"></path><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#2F6F62" stroke="#2F6F62" stroke-width="5" stroke-linejoin="round"></path></svg>
+      </div>
+      <span style="font-size: 12px; color: #5B6B65">App icon</span>
+    </div>
+
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1400,"height":860}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

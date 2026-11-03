@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Otto onboarding: hotkey try-it</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#24594A}a:hover{color:#17332A}
+button,input{font-family:inherit}
+button{cursor:pointer}
+</style>
+</helmet>
+<div style="width: 760px; height: 540px; box-sizing: border-box; background: #FFFFFF; color: #1C2622; font-family: 'Geist', system-ui, sans-serif; display: flex; flex-direction: column">
+  <div style="display: flex; justify-content: space-between; align-items: center; padding: 22px 28px">
+    <div style="display: flex; align-items: center; gap: 8px">
+      <svg width="24" height="24" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"></path><path d="M34 46 Q39 40 44 46" fill="none" stroke="#2F6F62" stroke-width="6" stroke-linecap="round"></path><path d="M56 46 Q61 40 66 46" fill="none" stroke="#2F6F62" stroke-width="6" stroke-linecap="round"></path><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round"></path></svg>
+      <span style="font-size: 15px; font-weight: 600">Otto</span>
+    </div>
+    <span style="font-size: 13px; color: #5B6B65">4 / 5</span>
+  </div>
+
+  <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 8px 72px 0; text-align: center">
+    <h1 style="margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.01em">Let's try it</h1>
+    <p style="margin: 0; font-size: 15px; color: #5B6B65">Hold the keys and say "hi Otto". Let go when you're done.</p>
+
+    <div style="display: flex; align-items: center; gap: 8px; margin-top: 14px">
+      <span style="width: 60px; height: 60px; border-radius: 12px; background: #F3F7F5; border: 1px solid #E3EBE7; display: flex; align-items: center; justify-content: center; font-size: 20px">⌃</span>
+      <span style="width: 60px; height: 60px; border-radius: 12px; background: #F3F7F5; border: 1px solid #E3EBE7; display: flex; align-items: center; justify-content: center; font-size: 20px">⌥</span>
+      <span style="width: 180px; height: 60px; border-radius: 12px; background: #F3F7F5; border: 1px solid #E3EBE7; display: flex; align-items: center; justify-content: center; font-size: 15px; color: #3A4A44">space</span>
+    </div>
+    <button style="height: 32px; padding: 0 8px; border: 0; background: transparent; color: #24594A; font-size: 13px; font-weight: 500">Change</button>
+
+    <div style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; box-sizing: border-box; background: #DDF1E6; border-radius: 999px">
+      <span style="font-size: 14px; font-weight: 500; color: #24594A">Heard you</span>
+      <span style="font-size: 14px; color: #3A5A4E">"hi Otto"</span>
+    </div>
+    <span style="font-size: 13px; color: #5B6B65">Mic, hotkey and speech are working.</span>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; padding: 22px 28px">
+    <button style="height: 44px; padding: 0 12px; border: 0; background: transparent; color: #5B6B65; font-size: 15px; font-weight: 500">Back</button>
+    <button style="height: 44px; padding: 0 24px; border-radius: 10px; border: 0; background: #2F6F62; color: #FFFFFF; font-size: 15px; font-weight: 500">Continue</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":760,"height":540}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

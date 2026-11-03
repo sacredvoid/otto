@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Otto onboarding: permissions</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#24594A}a:hover{color:#17332A}
+button{font-family:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 760px; height: 540px; box-sizing: border-box; background: #FFFFFF; color: #1C2622; font-family: 'Geist', system-ui, sans-serif; display: flex; flex-direction: column">
+  <div style="display: flex; justify-content: space-between; align-items: center; padding: 22px 28px">
+    <div style="display: flex; align-items: center; gap: 8px">
+      <svg width="24" height="24" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"></path><path d="M34 46 Q39 40 44 46" fill="none" stroke="#2F6F62" stroke-width="6" stroke-linecap="round"></path><path d="M56 46 Q61 40 66 46" fill="none" stroke="#2F6F62" stroke-width="6" stroke-linecap="round"></path><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round"></path></svg>
+      <span style="font-size: 15px; font-weight: 600">Otto</span>
+    </div>
+    <span style="font-size: 13px; color: #5B6B65">2 / 5</span>
+  </div>
+
+  <div style="flex: 1; display: flex; flex-direction: column; padding: 8px 72px 0">
+    <h1 style="margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -0.01em">A few permissions</h1>
+    <p style="margin: 8px 0 24px; font-size: 14px; color: #5B6B65">macOS asks you to confirm each one. Change them anytime in Settings.</p>
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 16px 0; border-top: 1px solid #EDF2EF">
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 3px">
+        <span style="font-size: 15px; font-weight: 500">Microphone</span>
+        <span style="font-size: 13px; color: #5B6B65">Only while you hold the hotkey.</span>
+      </div>
+      <span style="height: 30px; padding: 0 12px; border-radius: 999px; background: #DDF1E6; color: #24594A; font-size: 13px; font-weight: 500; display: flex; align-items: center">Allowed</span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 16px 0; border-top: 1px solid #EDF2EF">
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 3px">
+        <span style="font-size: 15px; font-weight: 500">Notifications</span>
+        <span style="font-size: 13px; color: #5B6B65">A backup for when the overlay is hidden.</span>
+      </div>
+      <button style="height: 34px; padding: 0 16px; border-radius: 9px; border: 1px solid #D5E2DC; background: #FFFFFF; color: #1C2622; font-size: 13px; font-weight: 500">Allow</button>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 16px 0; border-top: 1px solid #EDF2EF; border-bottom: 1px solid #EDF2EF">
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 3px">
+        <span style="font-size: 15px; font-weight: 500">Folders <span style="font-size: 13px; font-weight: 400; color: #5B6B65">optional</span></span>
+        <span style="font-size: 13px; color: #5B6B65">Documents, Desktop and Downloads, so Otto can find and save files.</span>
+      </div>
+      <button style="height: 34px; padding: 0 16px; border-radius: 9px; border: 1px solid #D5E2DC; background: #FFFFFF; color: #1C2622; font-size: 13px; font-weight: 500">Choose</button>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; padding: 22px 28px">
+    <button style="height: 44px; padding: 0 12px; border: 0; background: transparent; color: #5B6B65; font-size: 15px; font-weight: 500">Back</button>
+    <button style="height: 44px; padding: 0 24px; border-radius: 10px; border: 0; background: #2F6F62; color: #FFFFFF; font-size: 15px; font-weight: 500">Continue</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":760,"height":540}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

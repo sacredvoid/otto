@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Otto overlay parts</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#24594A}a:hover{color:#17332A}
+button{font-family:inherit;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 1040px; height: 900px; box-sizing: border-box; padding: 56px; background: #EEF4F1; font-family: 'Geist', system-ui, sans-serif; color: #1C2622; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 56px">
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+  <span style="font-size: 13px; color: #5B6B65">Pill, while you talk</span>
+
+  <div style="align-self: flex-start; display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 18px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E3EBE7; border-radius: 999px">
+    <div style="display: flex; align-items: center; gap: 3px; height: 22px">
+      <sc-for list="{{bars}}" as="b" hint-placeholder-count="16">
+        <span style="width: 3px; border-radius: 2px; background: #8CC9B2; height: {{b.h}}px"></span>
+      </sc-for>
+    </div>
+    <span style="font-size: 14px; font-weight: 500">Listening</span>
+  </div>
+
+  <div style="align-self: flex-start; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 18px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E3EBE7; border-radius: 999px">
+    <span style="display: flex; gap: 4px">
+      <span style="width: 5px; height: 5px; border-radius: 3px; background: #6DBF9C"></span>
+      <span style="width: 5px; height: 5px; border-radius: 3px; background: #6DBF9C; opacity: 0.55"></span>
+      <span style="width: 5px; height: 5px; border-radius: 3px; background: #6DBF9C; opacity: 0.25"></span>
+    </span>
+    <span style="font-size: 14px; font-weight: 500">Transcribing</span>
+  </div>
+
+  <div style="align-self: flex-start; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; box-sizing: border-box; background: #DDF1E6; border-radius: 999px">
+    <span style="font-size: 14px; font-weight: 500; color: #24594A">Got it</span>
+    <span style="font-size: 14px; color: #3A5A4E">Q3 hiring deck</span>
+  </div>
+
+  <div style="align-self: flex-start; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E3EBE7; border-radius: 999px">
+    <span style="font-size: 14px; font-weight: 500">Didn't catch that</span>
+    <span style="font-size: 13px; color: #5B6B65">hold and try again</span>
+  </div>
+
+  <span style="margin-top: 28px; font-size: 13px; color: #5B6B65">Toast, failed</span>
+  <div style="background: #FFFFFF; border: 1px solid #EED6D3; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px">
+    <div style="display: flex; align-items: center; gap: 8px">
+      <span style="width: 8px; height: 8px; border-radius: 4px; background: #E3A29C"></span>
+      <span style="font-size: 14px; font-weight: 600">Couldn't finish the lease summary</span>
+    </div>
+    <span style="font-size: 13px; color: #5B6B65; padding-left: 16px">No PDF matching "lease" in Downloads or Documents.</span>
+    <div style="display: flex; gap: 16px; padding-left: 16px; margin-top: 4px">
+      <button style="padding: 0; border: 0; background: transparent; color: #24594A; font-size: 13px; font-weight: 600">Retry</button>
+      <button style="padding: 0; border: 0; background: transparent; color: #5B6B65; font-size: 13px; font-weight: 500">View log</button>
+    </div>
+  </div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 14px">
+  <span style="font-size: 13px; color: #5B6B65">Chip, idle</span>
+  <div style="align-self: flex-start; display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 14px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E3EBE7; border-radius: 999px">
+    <span style="width: 8px; height: 8px; border-radius: 4px; background: #6DBF9C"></span>
+    <span style="font-size: 13px; font-weight: 500">2 running</span>
+    <span style="width: 1px; height: 14px; background: #E3EBE7"></span>
+    <span style="font-size: 13px; font-weight: 500; color: #2B5677">1 needs you</span>
+  </div>
+
+  <span style="margin-top: 28px; font-size: 13px; color: #5B6B65">Chip, hovered</span>
+  <div style="background: #FFFFFF; border: 1px solid #E3EBE7; border-radius: 16px; padding: 6px 0; display: flex; flex-direction: column">
+    <div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 18px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <span style="font-size: 14px; font-weight: 500">Q3 hiring deck</span>
+        <span style="font-size: 12px; color: #24594A">Slide 3 of 5</span>
+      </div>
+      <div style="height: 3px; border-radius: 2px; background: #EDF2EF"><div style="width: 60%; height: 3px; border-radius: 2px; background: #8CC9B2"></div></div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; margin: 0 6px; border-radius: 10px; background: #F0F6FB">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 14px; font-weight: 500">Reply to Priya</span>
+        <span style="font-size: 12px; color: #2B5677">Draft ready, waiting for you</span>
+      </div>
+      <button style="height: 30px; padding: 0 12px; border-radius: 8px; border: 0; background: #2B5677; color: #FFFFFF; font-size: 12px; font-weight: 500">Review</button>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 14px 18px">
+      <span style="font-size: 14px; color: #3A4A44">Rename screenshots</span>
+      <span style="font-size: 12px; color: #5B6B65">Done, 4m</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 0 18px 14px">
+      <span style="font-size: 14px; color: #3A4A44">Dentist reminder</span>
+      <span style="font-size: 12px; color: #5B6B65">Done, 12m</span>
+    </div>
+
+    <div style="border-top: 1px solid #EDF2EF; padding: 12px 18px 8px">
+      <a href="#" style="font-size: 13px; text-decoration: none">History and activity log</a>
+    </div>
+  </div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1040,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const hs = [4, 8, 14, 20, 12, 18, 22, 10, 16, 20, 8, 14, 18, 10, 6, 4];
+    return { bars: hs.map((h) => ({ h })) };
+  }
+}
+</script>
+</body>
+</html>

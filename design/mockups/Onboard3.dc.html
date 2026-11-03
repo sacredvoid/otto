@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Otto onboarding: pick your AI</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#24594A}a:hover{color:#17332A}
+button,input,select{font-family:inherit}
+button{cursor:pointer}
+</style>
+</helmet>
+<div style="width: 760px; height: 540px; box-sizing: border-box; background: #FFFFFF; color: #1C2622; font-family: 'Geist', system-ui, sans-serif; display: flex; flex-direction: column">
+  <div style="display: flex; justify-content: space-between; align-items: center; padding: 22px 28px">
+    <div style="display: flex; align-items: center; gap: 8px">
+      <svg width="24" height="24" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"></path><path d="M34 46 Q39 40 44 46" fill="none" stroke="#2F6F62" stroke-width="6" stroke-linecap="round"></path><path d="M56 46 Q61 40 66 46" fill="none" stroke="#2F6F62" stroke-width="6" stroke-linecap="round"></path><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round"></path></svg>
+      <span style="font-size: 15px; font-weight: 600">Otto</span>
+    </div>
+    <span style="font-size: 13px; color: #5B6B65">3 / 5</span>
+  </div>
+
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 0 72px">
+    <h1 style="margin: 0 0 4px; font-size: 26px; font-weight: 600; letter-spacing: -0.01em">Which AI should do the work?</h1>
+    <p style="margin: 0 0 10px; font-size: 14px; color: #5B6B65">Found on this Mac:</p>
+
+    <label style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 12px; background: #EEF8F2; cursor: pointer">
+      <input type="radio" name="ai" defaultChecked="{{ true }}" style="width: 16px; height: 16px; accent-color: #2F6F62; margin: 0">
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 15px; font-weight: 500">Claude Code</span>
+        <span style="font-size: 13px; color: #4A5E56">Uses your Claude subscription</span>
+      </div>
+    </label>
+
+    <label style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 12px; cursor: pointer">
+      <input type="radio" name="ai" style="width: 16px; height: 16px; accent-color: #2F6F62; margin: 0">
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 15px; font-weight: 500">Ollama</span>
+        <span style="font-size: 13px; color: #5B6B65">Runs on this Mac, llama3.1:8b</span>
+      </div>
+    </label>
+
+    <div style="height: 1px; background: #EDF2EF; margin: 10px 0"></div>
+
+    <span style="font-size: 14px; color: #5B6B65">Or use an API key</span>
+    <div style="display: flex; gap: 8px; align-items: center">
+      <label for="prov" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Provider</label>
+      <select id="prov" style="height: 40px; width: 140px; border-radius: 9px; border: 1px solid #D5E2DC; padding: 0 10px; font-size: 14px; background: #FFFFFF; color: #1C2622">
+        <option>Anthropic</option>
+        <option>OpenAI</option>
+        <option>Gemini</option>
+        <option>OpenRouter</option>
+      </select>
+      <label for="key" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">API key</label>
+      <input id="key" type="password" placeholder="Paste key, saved in Keychain" style="flex: 1; height: 40px; box-sizing: border-box; border-radius: 9px; border: 1px solid #D5E2DC; padding: 0 12px; font-family: 'Geist Mono', monospace; font-size: 13px; color: #1C2622">
+      <button style="height: 40px; padding: 0 16px; border-radius: 9px; border: 1px solid #D5E2DC; background: #FFFFFF; color: #1C2622; font-size: 13px; font-weight: 500">Test</button>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; padding: 22px 28px">
+    <button style="height: 44px; padding: 0 12px; border: 0; background: transparent; color: #5B6B65; font-size: 15px; font-weight: 500">Back</button>
+    <button style="height: 44px; padding: 0 24px; border-radius: 10px; border: 0; background: #2F6F62; color: #FFFFFF; font-size: 15px; font-weight: 500">Continue</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":760,"height":540}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

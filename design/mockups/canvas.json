@@ -1,0 +1,27 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-03T20:10:00Z"},
+  "title": "Otto Mockups",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1440, "h": 900, "title": "Desktop: Otto working while you focus"},
+    "OverlayParts.dc.html": {"x": 1520, "y": 0, "w": 1040, "h": 900, "title": "Overlay parts: pill, chip, toasts"},
+    "Onboard1.dc.html": {"x": 0, "y": 1340, "w": 760, "h": 540, "title": "1 Welcome", "radius": 14},
+    "Onboard2.dc.html": {"x": 840, "y": 1340, "w": 760, "h": 540, "title": "2 Permissions", "radius": 14},
+    "Onboard3.dc.html": {"x": 1680, "y": 1340, "w": 760, "h": 540, "title": "3 Pick your AI", "radius": 14},
+    "Onboard4.dc.html": {"x": 2520, "y": 1340, "w": 760, "h": 540, "title": "4 Hotkey try-it", "radius": 14},
+    "Onboard5.dc.html": {"x": 3360, "y": 1340, "w": 760, "h": 540, "title": "5 Ready", "radius": 14},
+    "Logos.dc.html": {"x": 0, "y": 2300, "w": 1400, "h": 680, "title": "Logo concepts"},
+    "Pebbles.dc.html": {"x": 1480, "y": 2300, "w": 1400, "h": 820, "title": "Pebble family"},
+    "Mascot.dc.html": {"x": 0, "y": 3480, "w": 1400, "h": 860, "title": "Mascot states + placements"}
+  },
+  "order": ["Main.dc.html", "OverlayParts.dc.html", "Onboard1.dc.html", "Onboard2.dc.html", "Onboard3.dc.html", "Onboard4.dc.html", "Onboard5.dc.html", "Logos.dc.html", "Pebbles.dc.html", "Mascot.dc.html"],
+  "notes": {
+    "t1": {"x": 0, "y": -300, "text": "Overlay: pill, chip, toasts", "kind": "title1", "maxW": 2560},
+    "t2": {"x": 0, "y": 1060, "text": "Onboarding (first launch)", "kind": "title1", "maxW": 4120},
+    "t3": {"x": 0, "y": 2020, "text": "Logo", "kind": "title1", "maxW": 2880},
+    "t4": {"x": 0, "y": 3200, "text": "Otto, the pebble in a bow tie", "kind": "title1", "maxW": 1400}
+  },
+  "designSystems": []
+}
