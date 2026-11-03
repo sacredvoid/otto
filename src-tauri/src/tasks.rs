@@ -200,7 +200,7 @@ fn run(app: &AppHandle, job: &Job) {
         Some((true, summary)) => {
             let _ = std::fs::write(job.dir.join("result.md"), &summary);
             println!("[otto] task {} done: {}", job.id, job.title);
-            emit(app, job.id, &job.title, "done", None, Some(summary));
+            emit(app, job.id, &job.title, "done", None, Some(preview(&summary)));
         }
         Some((false, msg)) if !msg.is_empty() => fail(msg),
         _ => {
@@ -241,6 +241,18 @@ pub(crate) fn claude_command(claude: &Path, prompt: &str, dir: &Path, gate_url: 
         cmd.arg("--add-dir").arg(d);
     }
     cmd
+}
+
+/// The card preview: the closing paragraph (the system prompt asks for a short
+/// plain summary there), without Markdown symbols. Full text lives in result.md.
+fn preview(text: &str) -> String {
+    let last = text
+        .split("\n\n")
+        .map(str::trim)
+        .filter(|p| !p.is_empty() && !p.starts_with("```"))
+        .last()
+        .unwrap_or("");
+    last.replace("**", "").replace('`', "").split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn describe_tool(name: &str, input: &Value) -> String {
@@ -352,6 +364,7 @@ mod tests {
         assert_eq!(slug("Make a 5-slide deck on Q3 hiring, please!"), "make-a-5-slide-deck-on");
         assert_eq!(slug("?!"), "task");
         assert_eq!(title_of("Summarize the lease."), "Summarize the lease");
+        assert_eq!(preview("Long body.\n\n```\ncode\n```\n\nDone: ran `git status`, **no** repo."), "Done: ran git status, no repo.");
     }
 
     #[test]

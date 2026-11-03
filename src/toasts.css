@@ -184,14 +184,53 @@ body {
 }
 .result {
   margin-top: 2px;
-  max-height: 360px;
+  max-height: 380px;
   overflow: auto;
   font-size: 13px;
   line-height: 1.5;
   color: var(--ink-2);
-  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   user-select: text;
   cursor: text;
+}
+.result > :first-child {
+  margin-top: 0;
+}
+.result p,
+.result ul,
+.result ol,
+.result pre {
+  margin: 8px 0 0;
+}
+.result .h {
+  font-weight: 600;
+  color: var(--ink);
+}
+.result ul,
+.result ol {
+  padding-left: 18px;
+}
+.result li + li {
+  margin-top: 2px;
+}
+.result pre,
+.result code {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  background: #f3f7f5;
+  border-radius: 6px;
+}
+.result pre {
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  color: var(--ink);
+}
+.result code {
+  padding: 1px 4px;
+}
+.result .url {
+  color: var(--muted);
+  font-size: 12px;
 }
 .files-label {
   margin: 10px 0 2px;

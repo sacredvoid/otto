@@ -15,6 +15,7 @@ use tauri_plugin_global_shortcut::ShortcutState;
 const HOTKEY: &str = "ctrl+alt+space";
 /// Shorter than this is an accidental tap, not speech.
 const MIN_SAMPLES: usize = stt::SAMPLE_RATE as usize * 3 / 10;
+const RELEASE_TAIL: Duration = Duration::from_millis(300);
 
 #[derive(Default)]
 struct Otto {
@@ -65,15 +66,17 @@ fn on_release(app: &AppHandle) {
     let Some(recording) = otto.recording.lock().unwrap().take() else {
         return;
     };
-    let samples = recording.stop();
-    if samples.len() < MIN_SAMPLES {
-        pill(app, "miss", None, None);
-        hide_later(app);
-        return;
-    }
-    pill(app, "transcribing", None, None);
     let app = app.clone();
     std::thread::spawn(move || {
+        // People let go of the key on their last syllable; keep listening briefly.
+        std::thread::sleep(RELEASE_TAIL);
+        let samples = recording.stop();
+        if samples.len() < MIN_SAMPLES {
+            pill(&app, "miss", None, None);
+            hide_later(&app);
+            return;
+        }
+        pill(&app, "transcribing", None, None);
         let started = Instant::now();
         let result = match app.state::<Otto>().stt.get() {
             Some(Ok(stt)) => stt.transcribe(&samples),
