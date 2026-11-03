@@ -26,6 +26,21 @@
         "shadow": false,
         "focus": false,
         "visible": false
+      },
+      {
+        "label": "toasts",
+        "title": "Otto tasks",
+        "url": "toasts.html",
+        "width": 380,
+        "height": 10,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "focus": false,
+        "visible": false
       }
     ],
     "security": {

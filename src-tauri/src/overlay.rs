@@ -26,6 +26,41 @@ pub fn place(app: &AppHandle) {
     mac::make_panel(&win);
 }
 
+const TOAST_WIDTH: f64 = 380.0;
+const TOAST_MAX_HEIGHT: f64 = 720.0;
+
+/// Top-right stack for task cards. Unlike the pill, it takes clicks
+/// (Open, Show in Finder), but as a non-activating panel it still never
+/// steals keyboard focus.
+pub fn place_toasts(app: &AppHandle) {
+    let Some(win) = app.get_webview_window("toasts") else { return };
+    if let Ok(Some(m)) = win.primary_monitor() {
+        let s = m.scale_factor();
+        let size = m.size().to_logical::<f64>(s);
+        let pos = m.position().to_logical::<f64>(s);
+        let _ = win.set_position(LogicalPosition::new(pos.x + size.width - TOAST_WIDTH - 12.0, pos.y + 36.0));
+    }
+    #[cfg(target_os = "macos")]
+    mac::make_panel(&win);
+}
+
+/// The webview reports its content height; 0 means no cards, so hide.
+pub fn set_toasts_height(app: &AppHandle, height: f64) {
+    let Some(win) = app.get_webview_window("toasts") else { return };
+    if !(height >= 1.0) {
+        let _ = win.hide();
+        return;
+    }
+    let _ = win.set_size(tauri::LogicalSize::new(TOAST_WIDTH, height.min(TOAST_MAX_HEIGHT)));
+    #[cfg(target_os = "macos")]
+    {
+        let w = win.clone();
+        let _ = app.run_on_main_thread(move || mac::order_front(&w));
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = win.show();
+}
+
 #[cfg(target_os = "macos")]
 mod mac {
     use objc2::msg_send;

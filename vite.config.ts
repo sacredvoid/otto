@@ -10,6 +10,12 @@ export default defineConfig(() => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
+  // Two pages: the listening pill (index.html) and the task cards (toasts.html).
+  build: {
+    rollupOptions: {
+      input: { overlay: "index.html", toasts: "toasts.html" },
+    },
+  },
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,

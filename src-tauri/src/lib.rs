@@ -1,6 +1,7 @@
 mod audio;
 mod overlay;
 mod stt;
+mod tasks;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -80,9 +81,15 @@ fn on_release(app: &AppHandle) {
         };
         let ms = started.elapsed().as_millis();
         match result {
-            Ok(text) if !text.is_empty() => {
+            Ok(text) if is_speech(&text) => {
                 println!("[otto] heard in {ms} ms: {text}");
-                pill(&app, "heard", Some(text), Some(ms));
+                match tasks::Tasks::submit(&app, &text) {
+                    Ok(title) => pill(&app, "heard", Some(title), Some(ms)),
+                    Err(e) => {
+                        eprintln!("[otto] could not queue task: {e}");
+                        pill(&app, "miss", Some(e), None);
+                    }
+                }
             }
             Ok(_) => pill(&app, "miss", None, None),
             Err(e) => {
@@ -92,6 +99,27 @@ fn on_release(app: &AppHandle) {
         }
         hide_later(&app);
     });
+}
+
+/// Whisper renders silence as tags like "[BLANK_AUDIO]" or "(wind blowing)".
+fn is_speech(text: &str) -> bool {
+    let t = text.trim();
+    !t.is_empty() && !(t.starts_with(['[', '(']) && t.ends_with([']', ')']))
+}
+
+#[tauri::command]
+fn open_task(tasks: tauri::State<tasks::Tasks>, id: u64, reveal: bool) -> Result<(), String> {
+    let target = tasks.open_target(id).ok_or("unknown task")?;
+    let mut cmd = std::process::Command::new("open");
+    if reveal {
+        cmd.arg("-R");
+    }
+    cmd.arg(target).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_toasts_height(app: AppHandle, height: f64) {
+    overlay::set_toasts_height(&app, height);
 }
 
 fn hide_later(app: &AppHandle) {
@@ -109,6 +137,8 @@ fn hide_later(app: &AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .manage(Otto::default())
+        .manage(tasks::Tasks::default())
+        .invoke_handler(tauri::generate_handler![open_task, set_toasts_height])
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcuts([HOTKEY])
@@ -123,6 +153,7 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             overlay::place(app.handle());
+            overlay::place_toasts(app.handle());
 
             let handle = app.handle().clone();
             std::thread::spawn(move || {

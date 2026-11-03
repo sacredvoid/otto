@@ -1,0 +1,24 @@
+/* Otto mascot motion, shared by the pill and the task cards.
+   Timings match design/mockups/Mascot.dc.html. */
+.m { transform-box: fill-box; transform-origin: 50% 100%; }
+.listen { animation: listenTilt 3s ease-in-out infinite; }
+.ear { transform-box: fill-box; transform-origin: 100% 60%; animation: earPop 3s ease-in-out infinite; }
+.bob { animation: bob 1.2s ease-in-out infinite; }
+.blink { transform-box: fill-box; transform-origin: center; animation: blink 4s infinite; }
+.hop { animation: hop 1.8s ease-in-out 1; }
+.tilt { animation: tilt 3s ease-in-out infinite; }
+.breathe { animation: breathe 3.6s ease-in-out infinite; }
+.droop { animation: droop 3.2s ease-in-out 1 forwards; }
+
+@keyframes listenTilt { 0%, 10% { transform: rotate(0); } 28%, 82% { transform: rotate(-9deg); } 100% { transform: rotate(0); } }
+@keyframes earPop { 0%, 10% { transform: scale(0); } 22% { transform: scale(1.2); } 30%, 82% { transform: scale(1); } 94%, 100% { transform: scale(0); } }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3%); } }
+@keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+@keyframes hop { 0%, 100% { transform: translateY(0) scale(1, 1); } 20% { transform: translateY(0) scale(1.06, 0.92); } 45% { transform: translateY(-12%) scale(0.97, 1.04); } 75% { transform: translateY(0) scale(1.04, 0.96); } }
+@keyframes tilt { 0%, 100% { transform: rotate(9deg); } 50% { transform: rotate(14deg); } }
+@keyframes breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.035, 0.965); } }
+@keyframes droop { to { transform: translateY(4%) scale(1.04, 0.94); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .m, .ear, .blink { animation: none !important; }
+}

@@ -254,6 +254,7 @@ Later:
 - Windows (needs low-level hook for key release, signing cert) and Linux (Wayland: XDG GlobalShortcuts portal or a `otto toggle` CLI bound by the user).
 - Codex / Gemini CLI / opencode adapters.
 - Cloud STT, follow-up turns, memory.
+- Calendar without full access: default to macOS write-only calendar access (add events, can't read them). Fallback for users who refuse any calendar permission: Otto maintains `otto.ics` and serves it at `webcal://localhost:<port>/otto.ics`; the user subscribes once in Calendar.app (auto-refreshes, no re-upload). Limits: read-only for the user, only on that Mac while Otto runs, no clash checking.
 - Native Gmail/Calendar (Google restricted scopes need a paid security assessment, so rely on user-supplied MCP servers until then).
 
 ## macOS permission gotchas
