@@ -19,6 +19,9 @@ impl Stt {
         if !path.exists() {
             return Err(format!("speech model not found at {}", path.display()));
         }
+        // With no log backend feature enabled this routes whisper.cpp's very
+        // chatty per-token logging into a no-op. Our own [otto] lines remain.
+        whisper_rs::install_logging_hooks();
         let path = path.to_str().ok_or("model path is not UTF-8")?;
         let ctx = WhisperContext::new_with_params(path, WhisperContextParameters::default())
             .map_err(|e| format!("could not load speech model: {e}"))?;
