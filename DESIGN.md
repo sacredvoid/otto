@@ -272,6 +272,13 @@ Later:
 4. **Competition.** Block's Goose (provider-agnostic, MCP-native desktop agent) is one voice feature away from this. Also Claude/ChatGPT desktop voice, Raycast AI, Wispr Flow / Superwhisper command modes, Apple Intelligence Siri. Open Interpreter 01 is the closest prior art and stalled; study why.
 5. **Wedge:** "hold a key, keep working, it reports back" plus real bring-your-own-AI.
 
+## M2 gate: what's verified (2026-11-03)
+
+- `--permission-prompt-tool mcp__otto__approve` over a local HTTP MCP endpoint works with `--restricted` (e2e tests in `src-tauri/src/gate.rs`): approved command runs, declined command doesn't, gate unreachable means nothing runs (fails closed, but slowly: ~7 min before Claude Code gives up).
+- `--restricted` drops the user's CLAUDE.md, hooks and allow-rules (canary checked). Skills and plugins still load.
+- Fable review (MUST-FIX) applied: unknown MCP tools always ask; taint covers WebSearch too and waits for the stream parser; Bash cards show any script the task wrote; `.git`/`.claude`/`.mcp.json` writes always ask; symlinks and `..` refused; hidden/bidi characters shown on cards; output rendered as plain text only.
+- LATER: Claude Code Bash sandbox via `--settings` (the T3 blocklist is a speed bump, not a control); connectors with an explicit per-tool allowlist; "allow for this task" only for exact repeats; narrow `--add-dir` to subfolders; minimum Claude Code version check.
+
 ## Unverified (check before building)
 
 - `global-hotkey` key-release events on Windows.

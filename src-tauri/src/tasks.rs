@@ -9,6 +9,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use serde_json::Value;
+use std::sync::Arc;
+
+use crate::gate::{self, Gate};
 use tauri::{AppHandle, Emitter, Manager};
 
 pub const MAX_RUNNING: usize = 3;
@@ -17,8 +20,10 @@ const SYSTEM_PROMPT: &str = "You are Otto, a background assistant on the user's 
 The user said this request out loud while focused on other work, and it was transcribed by \
 speech recognition, so quietly fix obvious mis-hearings. Do the task without asking follow-up \
 questions: make reasonable assumptions and mention them. Save anything you produce (documents, \
-notes, drafts, slide outlines) as files in the current directory. You cannot run shell commands. \
-Finish with a one or two sentence plain-text summary suitable for a notification, no markdown.";
+notes, drafts, slide outlines) as files in the current directory. Some actions need the user's \
+OK (running commands, changing files outside this folder, and web access after reading their \
+files); Otto asks them for you. If an action is declined, continue without it and say what you \
+skipped. Finish with a one or two sentence plain-text summary suitable for a notification, no markdown.";
 
 /// Files Otto writes into every task folder; never offered as "the result".
 const META_FILES: [&str; 3] = ["task.json", "log.jsonl", "result.md"];
@@ -78,17 +83,40 @@ impl Tasks {
         Ok(title)
     }
 
-    /// The best thing to open for a task: its only output file, else its folder.
-    pub fn open_target(&self, id: u64) -> Option<PathBuf> {
-        let dir = self.inner.lock().unwrap().dirs.get(&id)?.clone();
-        let outputs: Vec<PathBuf> = std::fs::read_dir(&dir)
-            .ok()?
-            .filter_map(|e| e.ok().map(|e| e.path()))
-            .filter(|p| p.is_file())
-            .filter(|p| !META_FILES.iter().any(|m| p.file_name().is_some_and(|n| n == *m)))
-            .collect();
-        Some(if outputs.len() == 1 { outputs[0].clone() } else { dir })
+    pub fn dir(&self, id: u64) -> Option<PathBuf> {
+        self.inner.lock().unwrap().dirs.get(&id).cloned()
     }
+}
+
+/// What a finished task produced: its summary and the files it wrote.
+#[derive(Serialize)]
+pub struct Details {
+    summary: String,
+    files: Vec<String>,
+}
+
+pub fn details(dir: &Path) -> Details {
+    let summary = std::fs::read_to_string(dir.join("result.md")).unwrap_or_default();
+    let mut files: Vec<String> = std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| !META_FILES.contains(&n.as_str()))
+        .collect();
+    files.sort();
+    Details { summary, files }
+}
+
+/// Resolves a file name from the webview to a file directly inside the task
+/// folder. Rejects anything that could escape it (separators, "..", symlinks out).
+pub fn task_file(dir: &Path, name: &str) -> Option<PathBuf> {
+    if name.is_empty() || name.contains(['/', '\\']) || name == ".." || name == "." {
+        return None;
+    }
+    let path = dir.join(name).canonicalize().ok()?;
+    (path.parent()? == dir.canonicalize().ok()?.as_path() && path.is_file()).then_some(path)
 }
 
 fn start_ready(app: &AppHandle) {
@@ -117,23 +145,19 @@ fn run(app: &AppHandle, job: &Job) {
     let Some(claude) = claude_bin() else {
         return fail("Claude Code isn't installed (or set OTTO_CLAUDE to its path).".into());
     };
-    // M1 safety: no shell, no MCP connectors, file edits only inside the task folder.
-    // The M2 permission gate replaces these blunt limits.
-    let child = Command::new(claude)
-        .arg("-p")
-        .arg(&job.prompt)
-        .args(["--output-format", "stream-json", "--verbose"])
-        .args(["--permission-mode", "acceptEdits", "--strict-mcp-config"])
-        .args(["--disallowedTools", "Bash"])
-        .args(["--append-system-prompt", SYSTEM_PROMPT])
-        .current_dir(&job.dir)
+    let gate = app.state::<Arc<Gate>>().inner().clone();
+    gate.register(job.id, &job.dir, &job.title);
+    let child = claude_command(&claude, &job.prompt, &job.dir, &gate.url(job.id))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn();
     let mut child = match child {
         Ok(c) => c,
-        Err(e) => return fail(format!("Couldn't start Claude Code: {e}")),
+        Err(e) => {
+            gate.unregister(job.id);
+            return fail(format!("Couldn't start Claude Code: {e}"));
+        }
     };
 
     let mut stderr = child.stderr.take().unwrap();
@@ -154,7 +178,9 @@ fn run(app: &AppHandle, job: &Job) {
             Some("assistant") => {
                 for c in ev["message"]["content"].as_array().into_iter().flatten() {
                     if c["type"] == "tool_use" {
-                        let step = describe_tool(c["name"].as_str().unwrap_or("tool"), &c["input"]);
+                        let name = c["name"].as_str().unwrap_or("tool");
+                        gate.observe(job.id, c["id"].as_str().unwrap_or(""), name, &c["input"]);
+                        let step = describe_tool(name, &c["input"]);
                         emit(app, job.id, &job.title, "running", Some(step), None);
                     }
                 }
@@ -168,6 +194,7 @@ fn run(app: &AppHandle, job: &Job) {
     }
     let status = child.wait();
     let stderr = stderr_reader.join().unwrap_or_default();
+    gate.unregister(job.id);
 
     match outcome {
         Some((true, summary)) => {
@@ -182,6 +209,38 @@ fn run(app: &AppHandle, job: &Job) {
             fail(if tail.is_empty() { format!("Claude Code exited ({code})") } else { tail.to_string() })
         }
     }
+}
+
+/// Tools Claude Code may use. Anything it would normally ask about goes to Otto's gate.
+const TOOLS: &str = "Read,Write,Edit,Glob,Grep,Bash,WebSearch,WebFetch,TodoWrite";
+
+/// Folders Otto may read without asking (still taints the task for web access).
+fn readable_dirs() -> Vec<PathBuf> {
+    let home = dirs::home_dir().unwrap_or_default();
+    ["Documents", "Desktop", "Downloads"].iter().map(|d| home.join(d)).filter(|p| p.is_dir()).collect()
+}
+
+/// `--restricted` ignores the user's own Claude settings, hooks and allow-rules,
+/// so nothing bypasses the gate. `--strict-mcp-config` keeps the tool set fixed:
+/// connectors come later with an explicit per-tool allowlist.
+pub(crate) fn claude_command(claude: &Path, prompt: &str, dir: &Path, gate_url: &str) -> Command {
+    let mcp = serde_json::json!({ "mcpServers": { "otto": { "type": "http", "url": gate_url } } });
+    let mut cmd = Command::new(claude);
+    cmd.arg("-p")
+        .arg(prompt)
+        .args(["--output-format", "stream-json", "--verbose"])
+        .args(["--restricted", "--strict-mcp-config", "--tools", TOOLS])
+        .arg("--mcp-config")
+        .arg(mcp.to_string())
+        .args(["--permission-prompt-tool", "mcp__otto__approve"])
+        .args(["--append-system-prompt", SYSTEM_PROMPT])
+        .current_dir(dir)
+        // Approvals can take minutes; don't let Claude Code time out the gate call first.
+        .env("MCP_TOOL_TIMEOUT", (gate::APPROVAL_TIMEOUT.as_millis() + 60_000).to_string());
+    for d in readable_dirs() {
+        cmd.arg("--add-dir").arg(d);
+    }
+    cmd
 }
 
 fn describe_tool(name: &str, input: &Value) -> String {
@@ -205,7 +264,7 @@ fn describe_tool(name: &str, input: &Value) -> String {
 }
 
 /// GUI apps don't inherit the shell PATH, so look in the usual places.
-fn claude_bin() -> Option<PathBuf> {
+pub(crate) fn claude_bin() -> Option<PathBuf> {
     static BIN: OnceLock<Option<PathBuf>> = OnceLock::new();
     BIN.get_or_init(|| {
         if let Some(p) = std::env::var_os("OTTO_CLAUDE").map(PathBuf::from).filter(|p| p.is_file()) {
@@ -293,6 +352,20 @@ mod tests {
         assert_eq!(slug("Make a 5-slide deck on Q3 hiring, please!"), "make-a-5-slide-deck-on");
         assert_eq!(slug("?!"), "task");
         assert_eq!(title_of("Summarize the lease."), "Summarize the lease");
+    }
+
+    #[test]
+    fn task_file_stays_inside_folder() {
+        let root = std::env::temp_dir().join(format!("otto-file-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("t")).unwrap();
+        std::fs::write(root.join("t/deck.md"), "x").unwrap();
+        std::fs::write(root.join("secret.txt"), "x").unwrap();
+        let dir = root.join("t");
+        assert!(task_file(&dir, "deck.md").is_some());
+        assert!(task_file(&dir, "../secret.txt").is_none());
+        assert!(task_file(&dir, "..").is_none());
+        assert!(task_file(&dir, "missing.md").is_none());
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

@@ -22,3 +22,11 @@
 @media (prefers-reduced-motion: reduce) {
   .m, .ear, .blink { animation: none !important; }
 }
+
+.nudge { animation: nudge 2.4s ease-in-out infinite; }
+.qm { transform-box: fill-box; transform-origin: 50% 100%; animation: qm 2.4s ease-in-out infinite; }
+@keyframes nudge { 0%, 60%, 100% { transform: rotate(0); } 66% { transform: rotate(-7deg); } 74% { transform: rotate(7deg); } 82% { transform: rotate(-4deg); } 90% { transform: rotate(0); } }
+@keyframes qm { 0%, 60%, 100% { transform: translateY(0); } 68% { transform: translateY(-4px); } 76% { transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .qm { animation: none !important; }
+}

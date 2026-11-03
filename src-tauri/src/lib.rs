@@ -1,4 +1,5 @@
 mod audio;
+mod gate;
 mod overlay;
 mod stt;
 mod tasks;
@@ -107,14 +108,34 @@ fn is_speech(text: &str) -> bool {
     !t.is_empty() && !(t.starts_with(['[', '(']) && t.ends_with([']', ')']))
 }
 
+fn task_dir(tasks: &tasks::Tasks, id: u64) -> Result<std::path::PathBuf, String> {
+    tasks.dir(id).ok_or_else(|| "unknown task".to_string())
+}
+
+fn open(args: &[&std::ffi::OsStr]) -> Result<(), String> {
+    std::process::Command::new("open").args(args).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
-fn open_task(tasks: tauri::State<tasks::Tasks>, id: u64, reveal: bool) -> Result<(), String> {
-    let target = tasks.open_target(id).ok_or("unknown task")?;
-    let mut cmd = std::process::Command::new("open");
-    if reveal {
-        cmd.arg("-R");
-    }
-    cmd.arg(target).spawn().map(|_| ()).map_err(|e| e.to_string())
+fn task_details(tasks: tauri::State<tasks::Tasks>, id: u64) -> Result<tasks::Details, String> {
+    Ok(tasks::details(&task_dir(&tasks, id)?))
+}
+
+#[tauri::command]
+fn open_task_file(tasks: tauri::State<tasks::Tasks>, id: u64, name: String) -> Result<(), String> {
+    let file = tasks::task_file(&task_dir(&tasks, id)?, &name).ok_or("not a file in this task")?;
+    open(&[file.as_os_str()])
+}
+
+/// Opens the task's folder as a Finder window.
+#[tauri::command]
+fn show_task_folder(tasks: tauri::State<tasks::Tasks>, id: u64) -> Result<(), String> {
+    open(&[task_dir(&tasks, id)?.as_os_str()])
+}
+
+#[tauri::command]
+fn answer_approval(gate: tauri::State<std::sync::Arc<gate::Gate>>, approval_id: u64, allow: bool) {
+    gate.answer(approval_id, allow);
 }
 
 #[tauri::command]
@@ -138,7 +159,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(Otto::default())
         .manage(tasks::Tasks::default())
-        .invoke_handler(tauri::generate_handler![open_task, set_toasts_height])
+        .invoke_handler(tauri::generate_handler![task_details, open_task_file, show_task_folder, answer_approval, set_toasts_height])
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcuts([HOTKEY])
@@ -154,6 +175,14 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             overlay::place(app.handle());
             overlay::place_toasts(app.handle());
+
+            let asks = app.handle().clone();
+            let audit = dirs::home_dir().unwrap_or_default().join("Otto/audit.jsonl");
+            let gate = gate::Gate::start(&audit, move |ask| {
+                println!("[otto] task {} needs you: {}", ask.task_id, ask.summary);
+                let _ = asks.emit("otto://approval", ask);
+            })?;
+            app.manage(gate);
 
             let handle = app.handle().clone();
             std::thread::spawn(move || {
