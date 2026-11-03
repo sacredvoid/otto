@@ -276,9 +276,9 @@ Later:
 - `global-hotkey` key-release events on Windows.
 - Whether Codex exec / Gemini CLI can route approvals to an external tool.
 - MCP Bundles support outside Claude Desktop.
-- STT latency numbers.
+- ~~STT latency numbers~~ Verified 2026-11-03: `base.en` on Apple Silicon, ~160 ms for a short command (debug build). Larger model still to benchmark.
 - `claude mcp list` (or a config file) shows claude.ai connectors like Gmail/Calendar, not just local MCP servers. Codex/Gemini equivalents.
-- `tauri-nspanel` works with current Tauri v2 (non-activating overlay that stays clickable).
+- ~~`tauri-nspanel` works with current Tauri v2~~ Not needed: M0 swaps the overlay's class to a non-activating `NSPanel` directly (`src-tauri/src/overlay.rs`). Verified 2026-11-03: shows over full-screen apps.
 
 ## Open decisions
 
