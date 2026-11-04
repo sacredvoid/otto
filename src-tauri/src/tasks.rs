@@ -324,6 +324,7 @@ const TOOLS: &str = "Read,Write,Edit,Glob,Grep,Bash,WebSearch,WebFetch,TodoWrite
 /// - "allow_tools": ["mcp__server__tool"] tools that run without asking (read-only ones only)
 /// - "disabled": ["Bash", "mcp__claude_ai_Gmail", "plugin:claude-mem@thedotmack"] tools, servers
 ///   (every tool under that prefix) or plugins Otto must not use. Set from the setup window.
+/// - "check_updates": false stops the daily check for a newer Otto on GitHub.
 /// - "model": "sonnet" Claude model for tasks (default: your Claude Code default). Faster models answer sooner.
 pub(crate) fn config() -> Value {
     std::fs::read(otto_dir().join("config.json"))

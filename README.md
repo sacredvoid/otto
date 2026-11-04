@@ -49,6 +49,8 @@ Otto has no model of its own. Each request runs as a `claude -p` task in restric
 
 The speech model ships inside the app, so there's nothing else to download.
 
+**Updates:** Otto checks GitHub once a day. When a new version is out, the menu bar menu shows *Update available*, which opens the download page. Turn it off with `"check_updates": false` in `~/Otto/config.json`.
+
 <details>
 <summary>Build from source</summary>
 

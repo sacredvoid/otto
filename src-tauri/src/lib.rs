@@ -6,6 +6,7 @@ mod overlay;
 mod stt;
 mod tasks;
 mod tray;
+mod updates;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -217,6 +218,7 @@ pub fn run() {
             overlay::place_toasts(app.handle());
             overlay::place_chip(app.handle());
             tray::start(app.handle())?;
+            updates::start(app.handle());
             let handle = app.handle().clone();
             tauri::Listener::listen_any(app.handle(), "otto://show-onboarding", move |_| {
                 onboarding::show_onboarding(&handle);
