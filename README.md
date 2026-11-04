@@ -1,6 +1,6 @@
 <h1 align="center"><img src="docs/otto.svg" width="44" align="center" alt=""> Otto</h1>
 
-<p align="center"><b>Talk to your Mac. Claude Code does it in the background.</b></p>
+<p align="center"><b>Your always-on assistant for the busywork on your Mac.</b></p>
 
 <p align="center">
   <a href="https://github.com/sacredvoid/otto/releases/latest"><img alt="Download for macOS" src="https://img.shields.io/badge/Download-macOS%20(Apple%20Silicon)-24594a?style=for-the-badge&logo=apple&logoColor=white"></a>

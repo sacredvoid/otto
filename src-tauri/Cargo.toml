@@ -1,7 +1,7 @@
 [package]
 name = "otto"
 version = "0.3.2"
-description = "Hold a key, say what you need, and Claude Code does it in the background."
+description = "Your always-on assistant for the busywork on your Mac."
 authors = ["Samanvya Tripathi"]
 edition = "2024"
 
