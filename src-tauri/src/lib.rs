@@ -131,7 +131,7 @@ fn task_dir(tasks: &tasks::Tasks, id: u64) -> Result<std::path::PathBuf, String>
     tasks.dir(id).ok_or_else(|| "unknown task".to_string())
 }
 
-fn open(args: &[&std::ffi::OsStr]) -> Result<(), String> {
+pub(crate) fn open(args: &[&std::ffi::OsStr]) -> Result<(), String> {
     std::process::Command::new("open").args(args).spawn().map(|_| ()).map_err(|e| e.to_string())
 }
 
@@ -192,7 +192,8 @@ pub fn run() {
             onboarding::onboarding_info, onboarding::onboarding_detect, onboarding::mic_status, onboarding::request_mic,
             onboarding::open_settings, onboarding::finish_onboarding, onboarding::detect_connectors,
             onboarding::claude_account, onboarding::claude_login, onboarding::claude_login_code, onboarding::claude_logout,
-            history::list_history, history::history_detail, history::open_history_file, history::show_history_folder])
+            history::list_history, history::history_detail, history::open_history_file, history::show_history_folder,
+            history::open_tasks_folder, history::open_setup, history::app_version])
         // Onboarding and History are reopened later from the tray, so closing only hides them.
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -220,10 +221,6 @@ pub fn run() {
             overlay::place_chip(app.handle());
             tray::start(app.handle())?;
             updates::start(app.handle());
-            let handle = app.handle().clone();
-            tauri::Listener::listen_any(app.handle(), "otto://show-onboarding", move |_| {
-                onboarding::show_onboarding(&handle);
-            });
 
             let asks = app.handle().clone();
             let audit = dirs::home_dir().unwrap_or_default().join("Otto/audit.jsonl");
@@ -265,7 +262,7 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = event {
                 if onboarding::is_onboarded() {
-                    history::show(app);
+                    history::show(app, "home");
                 } else {
                     onboarding::show_onboarding(app);
                 }

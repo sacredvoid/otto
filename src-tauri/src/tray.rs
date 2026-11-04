@@ -3,7 +3,7 @@ use std::sync::OnceLock;
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuBuilder, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Wry};
+use tauri::{AppHandle, Wry};
 
 /// Release page of a newer version, once one is found.
 static UPDATE_URL: OnceLock<String> = OnceLock::new();
@@ -12,16 +12,15 @@ const ICON: &[u8] = include_bytes!("../icons/tray/pebbleTemplate@2x.png");
 
 fn menu(app: &AppHandle, update: Option<&str>) -> tauri::Result<Menu<Wry>> {
     let hint = MenuItem::with_id(app, "hint", "Otto is listening: hold Ctrl+Option+Space", false, None::<&str>)?;
+    let home = MenuItem::with_id(app, "home", "Open Otto\u{2026}", true, None::<&str>)?;
     let history = MenuItem::with_id(app, "history", "History\u{2026}", true, None::<&str>)?;
-    let folder = MenuItem::with_id(app, "folder", "Open tasks folder", true, None::<&str>)?;
-    let setup = MenuItem::with_id(app, "setup", "Set up Otto\u{2026}", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Otto", true, None::<&str>)?;
     let mut b = MenuBuilder::new(app);
     if let Some(v) = update {
         let item = MenuItem::with_id(app, "update", format!("Update available: Otto {v}\u{2026}"), true, None::<&str>)?;
         b = b.item(&item).separator();
     }
-    b.items(&[&hint, &history, &folder, &setup, &PredefinedMenuItem::separator(app)?, &quit]).build()
+    b.items(&[&hint, &home, &history, &PredefinedMenuItem::separator(app)?, &quit]).build()
 }
 
 /// Puts "Update available" at the top of the menu.
@@ -41,15 +40,8 @@ pub fn start(app: &AppHandle) -> tauri::Result<()> {
         .icon_as_template(true)
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
-            "history" => crate::history::show(app),
-            "folder" => {
-                let dir = dirs::home_dir().unwrap_or_default().join("Otto/tasks");
-                let _ = std::fs::create_dir_all(&dir);
-                let _ = std::process::Command::new("open").arg(dir).spawn();
-            }
-            "setup" => {
-                let _ = app.emit("otto://show-onboarding", ());
-            }
+            "home" => crate::history::show(app, "home"),
+            "history" => crate::history::show(app, "history"),
             "update" => {
                 if let Some(url) = UPDATE_URL.get().filter(|u| u.starts_with(crate::updates::RELEASES)) {
                     let _ = std::process::Command::new("open").arg(url).spawn();

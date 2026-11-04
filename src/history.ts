@@ -40,6 +40,8 @@ const search = $<HTMLInputElement>("search");
 let entries: Entry[] = [];
 let shown: Entry[] = [];
 let selected: string | null = null;
+/** Home, or the history pane (a selected task or the empty state). */
+let view: "home" | "history" = "home";
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text?: string) {
   const e = document.createElement(tag);
@@ -83,8 +85,65 @@ function renderList() {
   if (selected) list.setAttribute("aria-activedescendant", `t-${selected}`);
 }
 
+function setView(v: typeof view) {
+  view = v;
+  $("home").hidden = v !== "home";
+  if (v === "home") {
+    $("task").hidden = true;
+    $("empty").hidden = true;
+    $("nav-home").setAttribute("aria-current", "page");
+  } else $("nav-home").removeAttribute("aria-current");
+}
+
+function greeting() {
+  const h = new Date().getHours();
+  return h < 5 ? "Up late?" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
+
+function showHome() {
+  selected = null;
+  list.removeAttribute("aria-activedescendant");
+  for (const li of list.querySelectorAll("li")) li.setAttribute("aria-selected", "false");
+  setView("home");
+  renderHome();
+}
+
+/** History with nothing picked: open the newest task, or say there are none. */
+function showHistory() {
+  if (shown.length) return select(shown[0].folder);
+  setView("history");
+  $("task").hidden = true;
+  $("empty").hidden = false;
+}
+
+function renderHome() {
+  $("greet").textContent = greeting();
+  const today = new Date().setHours(0, 0, 0, 0) / 1000;
+  $("s-running").textContent = String(entries.filter((e) => e.status === "running").length);
+  $("s-today").textContent = String(entries.filter((e) => e.status === "done" && e.created_unix >= today).length);
+  $("s-total").textContent = String(entries.length);
+  const recent = entries.slice(0, 4);
+  $("recent-empty").hidden = recent.length > 0;
+  $("see-all").hidden = !recent.length;
+  $("recent").replaceChildren(
+    ...recent.map((e) => {
+      const li = el("li");
+      const b = el("button", "recent-item");
+      b.type = "button";
+      const text = el("span", "text");
+      text.append(el("span", "title", firstLine(e.transcript)), el("span", `when ${e.status}`, relative(e.created_unix)));
+      b.append(statusBadge(e.status), text);
+      b.setAttribute("aria-label", `${firstLine(e.transcript)}, ${STATUS_LABEL[e.status]}`);
+      b.addEventListener("click", () => select(e.folder));
+      li.append(b);
+      return li;
+    }),
+  );
+}
+
 async function select(folder: string) {
   selected = folder;
+  setView("history");
   for (const li of list.querySelectorAll<HTMLElement>("li")) {
     const on = li.dataset.folder === folder;
     li.setAttribute("aria-selected", String(on));
@@ -189,12 +248,11 @@ function renderDetail(folder: string, d: Detail) {
 
 async function refresh() {
   entries = await invoke<Entry[]>("list_history");
-  $("empty").hidden = entries.length > 0;
   if (selected && !entries.some((e) => e.folder === selected)) selected = null;
   renderList();
-  if (!selected && shown.length) select(shown[0].folder);
+  if (view === "home") renderHome();
   else if (selected) select(selected); // its status may have changed
-  else $("task").hidden = true;
+  else showHistory();
 }
 
 function move(by: number) {
@@ -213,10 +271,18 @@ function onKey(e: KeyboardEvent) {
 
 search.addEventListener("input", () => {
   renderList();
+  if (view === "home" && search.value.trim()) return showHistory();
   if (shown.length && !shown.some((e) => e.folder === selected)) select(shown[0].folder);
 });
 search.addEventListener("keydown", onKey);
 list.addEventListener("keydown", onKey);
+
+$("nav-home").addEventListener("click", showHome);
+$("see-all").addEventListener("click", showHistory);
+for (const id of ["nav-setup", "a-setup"]) $(id).addEventListener("click", () => invoke("open_setup"));
+$("a-folder").addEventListener("click", () => invoke("open_tasks_folder"));
+invoke<string>("app_version").then((v) => ($("version").textContent = `Otto ${v}`));
+listen<string>("otto://view", ({ payload }) => (payload === "history" ? showHistory() : showHome()));
 
 getCurrentWindow().onFocusChanged(({ payload: focused }) => focused && refresh());
 listen<{ status: string }>("otto://task", ({ payload }) => {

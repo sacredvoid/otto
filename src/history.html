@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Otto History</title>
+    <title>Otto</title>
     <link rel="stylesheet" href="./history.css" />
     <link rel="stylesheet" href="./mascot.css" />
     <script type="module" src="./history.ts"></script>
@@ -16,15 +16,71 @@
           <path d="M34 46 Q39 40 44 46 M56 46 Q61 40 66 46" fill="none" stroke="#2F6F62" stroke-width="6" stroke-linecap="round" />
           <path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round" />
         </svg>
-        <span>History</span>
+        <span>Otto</span>
       </div>
+      <nav class="nav" aria-label="Otto">
+        <button id="nav-home" type="button" class="nav-item" aria-current="page">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 7 8 2.5 13.5 7v6a.5.5 0 0 1-.5.5H10V10H6v3.5H3a.5.5 0 0 1-.5-.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /></svg>
+          Home
+        </button>
+      </nav>
+      <h2 class="side-label">History</h2>
       <input id="search" type="search" placeholder="Search what you said" aria-label="Search tasks" autocomplete="off" spellcheck="false" />
       <ul id="list" role="listbox" aria-label="Tasks" tabindex="0"></ul>
       <p id="no-match" class="muted small pad" hidden>No tasks match.</p>
+      <div class="side-foot">
+        <button id="nav-setup" type="button" class="nav-item">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4.5h7M12.5 4.5h1M2.5 11.5h1M6.5 11.5h7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /><circle cx="11" cy="4.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4" /><circle cx="5" cy="11.5" r="1.6" fill="none" stroke="currentColor" stroke-width="1.4" /></svg>
+          Setup
+        </button>
+      </div>
     </aside>
 
     <main id="detail" aria-live="polite">
-      <div id="empty" class="empty">
+      <section id="home" class="home" aria-labelledby="greet">
+        <div class="hero">
+          <svg width="76" height="76" viewBox="0 0 100 100" aria-hidden="true">
+            <g class="m breathe">
+              <path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3" />
+              <path d="M34 46 Q39 40 44 46 M56 46 Q61 40 66 46" fill="none" stroke="#2F6F62" stroke-width="5" stroke-linecap="round" />
+              <path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round" />
+              <circle cx="50" cy="81" r="3.5" fill="#2F6F62" />
+            </g>
+          </svg>
+          <div>
+            <h1 id="greet">Hi</h1>
+            <p class="lead hint">Hold <kbd>&#8963;</kbd><kbd>&#8997;</kbd><kbd>space</kbd> and say what you need.</p>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><span id="s-running" class="num">0</span><span class="muted small">Running now</span></div>
+          <div class="stat"><span id="s-today" class="num">0</span><span class="muted small">Done today</span></div>
+          <div class="stat"><span id="s-total" class="num">0</span><span class="muted small">All tasks</span></div>
+        </div>
+
+        <div class="sec-head">
+          <h2 class="sec">Recent</h2>
+          <button id="see-all" type="button" class="link">See all</button>
+        </div>
+        <ul id="recent" class="recent" aria-label="Recent tasks"></ul>
+        <p id="recent-empty" class="muted small try" hidden>Nothing yet. Try saying: "summarize the newest PDF in Downloads".</p>
+
+        <h2 class="sec">Shortcuts</h2>
+        <div class="actions">
+          <button id="a-setup" type="button" class="action">
+            <span class="a-title">Setup</span>
+            <span class="muted small">Your AI, permissions, folders and tools</span>
+          </button>
+          <button id="a-folder" type="button" class="action">
+            <span class="a-title">Tasks folder</span>
+            <span class="muted small">Everything Otto made, in ~/Otto/tasks</span>
+          </button>
+        </div>
+        <p id="version" class="muted small version"></p>
+      </section>
+
+      <div id="empty" class="empty" hidden>
         <svg width="80" height="80" viewBox="0 0 100 100" aria-hidden="true">
           <g class="m breathe">
             <path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3" />

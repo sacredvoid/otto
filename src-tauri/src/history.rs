@@ -1,22 +1,41 @@
-//! The History window: every past task, read straight from ~/Otto/tasks.
+//! Otto's main window: a home page plus every past task, read straight from ~/Otto/tasks.
 
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use serde_json::Value;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::tasks;
 
 const INPUT_MAX: usize = 300;
 
 /// Same dance as onboarding: an Accessory app must un-hide itself first.
-pub fn show(app: &AppHandle) {
+/// `view` is "home" or "history"; the page switches to it.
+pub fn show(app: &AppHandle, view: &'static str) {
     let Some(win) = app.get_webview_window("history") else { return };
     #[cfg(target_os = "macos")]
     let _ = app.show();
+    let _ = app.emit_to("history", "otto://view", view);
     let _ = win.show();
     let _ = win.set_focus();
+}
+
+#[tauri::command]
+pub fn open_tasks_folder() -> Result<(), String> {
+    let dir = dirs::home_dir().ok_or("no home folder")?.join("Otto/tasks");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    crate::open(&[dir.as_os_str()])
+}
+
+#[tauri::command]
+pub fn open_setup(app: AppHandle) {
+    crate::onboarding::show_onboarding(&app);
+}
+
+#[tauri::command]
+pub fn app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
 }
 
 #[derive(Serialize)]
