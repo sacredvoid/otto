@@ -30,9 +30,9 @@ Mockups: https://claude.ai/artifact/8RCMzh2ifPQypHJ191iBbZ (source copied to `de
 
 ## Non-goals (v0.1)
 
-- Computer use (screen control).
+- Pixel-level computer use. Otto drives Mac apps through AppleScript, Shortcuts and System Events instead, with each action approved (added 2026-11-03).
 - Wake word / always listening.
-- Multi-turn conversation or long-term memory.
+- Multi-turn conversation. (Lightweight memory landed 2026-11-03: `~/Otto/memory.md`, recent requests, and optional memory plugins like claude-mem.)
 - Windows and Linux (designed for, not shipped).
 
 ## Architecture

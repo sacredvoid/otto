@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 120 110" width="120" height="110" role="img" aria-label="Otto, a pebble mascot">
+  <path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"/>
+  <circle cx="39" cy="44" r="6.5" fill="#1F3E5A"/>
+  <circle cx="61" cy="44" r="6.5" fill="#1F3E5A"/>
+  <path d="M42 58 Q50 64 58 58" fill="none" stroke="#1F3E5A" stroke-width="4" stroke-linecap="round"/>
+</svg>
