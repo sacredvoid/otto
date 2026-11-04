@@ -136,12 +136,10 @@ pub fn mic_status() -> &'static str {
 #[tauri::command]
 pub fn request_mic() {
     if mic_status() == "undetermined" {
-        std::thread::spawn(|| {
-            if let Ok(r) = crate::audio::Recording::start(|_| {}) {
-                std::thread::sleep(Duration::from_millis(200));
-                r.stop();
-            }
-        });
+        // Ask through AVFoundation, the same API mic_status reads. Prompting by
+        // opening a CoreAudio stream left that status stuck on "undetermined".
+        #[cfg(target_os = "macos")]
+        mac::request_mic();
     } else {
         open_settings("microphone".into());
     }
@@ -270,15 +268,25 @@ mod mac {
     #[link(name = "AVFoundation", kind = "framework")]
     unsafe extern "C" {}
 
+    /// AVCaptureDevice and AVMediaTypeAudio (the string "soun").
+    fn device_and_audio() -> Option<(&'static AnyClass, *mut AnyObject)> {
+        let device = AnyClass::get(c"AVCaptureDevice")?;
+        let string = AnyClass::get(c"NSString")?;
+        let media: *mut AnyObject = unsafe { msg_send![string, stringWithUTF8String: c"soun".as_ptr()] };
+        Some((device, media))
+    }
+
+    pub fn request_mic() {
+        let Some((device, media)) = device_and_audio() else { return };
+        let done = block2::RcBlock::new(|_granted: objc2::runtime::Bool| {});
+        unsafe {
+            let _: () = msg_send![device, requestAccessForMediaType: media, completionHandler: &*done];
+        }
+    }
+
     pub fn mic_status() -> &'static str {
-        let (Some(device), Some(string)) = (AnyClass::get(c"AVCaptureDevice"), AnyClass::get(c"NSString")) else {
-            return "undetermined";
-        };
-        // AVMediaTypeAudio is the string "soun".
-        let status: isize = unsafe {
-            let media: *mut AnyObject = msg_send![string, stringWithUTF8String: c"soun".as_ptr()];
-            msg_send![device, authorizationStatusForMediaType: media]
-        };
+        let Some((device, media)) = device_and_audio() else { return "undetermined" };
+        let status: isize = unsafe { msg_send![device, authorizationStatusForMediaType: media] };
         match status {
             3 => "granted",
             1 | 2 => "denied",
