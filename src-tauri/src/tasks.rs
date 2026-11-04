@@ -225,7 +225,7 @@ fn run(app: &AppHandle, job: &Job) {
         return fail("Claude Code isn't installed (or set OTTO_CLAUDE to its path).".into());
     };
     let gate = app.state::<Arc<Gate>>().inner().clone();
-    gate.register(job.id, &job.dir, &job.title, readable_dirs(), allow_tools(), disabled());
+    gate.register(job.id, &job.dir, &job.title, readable_dirs(), allow_tools(), disabled(), config()["ask_memory"] == true);
     let mut cmd = claude_command(&claude, &job.prompt, &job.dir, &gate.url(job.id));
     if let Some(session) = &job.resume {
         // The resumed conversation may already hold private data, so start tainted.
@@ -332,6 +332,7 @@ const TOOLS: &str = "Read,Write,Edit,Glob,Grep,Bash,WebSearch,WebFetch,TodoWrite
 /// - "allow_tools": ["mcp__server__tool"] tools that run without asking (read-only ones only)
 /// - "disabled": ["Bash", "mcp__claude_ai_Gmail", "plugin:claude-mem@thedotmack"] tools, servers
 ///   (every tool under that prefix) or plugins Otto must not use. Set from the setup window.
+/// - "ask_memory": true makes every memory save ask first (default: automatic). Set from the setup window.
 /// - "check_updates": false stops the daily check for a newer Otto on GitHub.
 /// - "model": "sonnet" Claude model for tasks (default: your Claude Code default). Faster models answer sooner.
 pub(crate) fn config() -> Value {
@@ -426,6 +427,20 @@ current folder and Read the image. For apps without AppleScript support, use Sys
 (click menu items or buttons by name) and check the result with another screenshot. Before sending a \
 message or email to anyone, state the exact recipient and text in the command so the user can check it.";
 
+const SHORTCUTS_GUIDE: &str = "Apple Shortcuts: you are fluent with the `shortcuts` CLI. `shortcuts list` \
+(add --show-identifiers or --folder-name) shows what the user has; `shortcuts run \"Name\" -i in.txt -o out.txt` \
+runs one with input and output files; `shortcuts view \"Name\"` opens it in the editor. Prefer running an \
+existing shortcut when one fits. To make a new shortcut: write it as an XML plist named draft.shortcut in the \
+task folder (the .shortcut extension is required even unsigned; keys \
+WFWorkflowActions, an array of {WFWorkflowActionIdentifier, WFWorkflowActionParameters} such as \
+is.workflow.actions.gettext, .getclipboard, .setclipboard, .openurl, .notification, .showresult, .ask, \
+.runshellscript, .runapplescript; plus WFWorkflowClientVersion, WFWorkflowMinimumClientVersion 900, \
+WFWorkflowIcon, WFWorkflowTypes and WFWorkflowInputContentItemClasses), check it with `plutil -lint`, sign it with \
+`shortcuts sign -m anyone -i draft.shortcut -o \"Name.shortcut\"` (needs internet), then `open \"Name.shortcut\"` so the \
+user clicks Add Shortcut; it can't be added silently. Keep shortcuts small: put real logic in a Run Shell Script \
+or Run AppleScript action. Automations (time, location, app-open triggers) can only be made in the Shortcuts \
+app, so tell the user the exact steps instead. Afterwards, say how to trigger it (name, menu bar, a key).";
+
 const MEMORY_GUIDE: &str = "Memory: the user's saved notes and recent requests are below; use them to \
 resolve vague requests (who someone is, which project, \"do that again\"). If you also have a memory \
 search tool from a plugin or server (for example claude-mem's search), search it when a request names \
@@ -444,7 +459,7 @@ fn system_prompt(readable: &[PathBuf], task_dir: &Path) -> String {
 (\"documents local\" may mean a folder like Documents-Local). When looking for files, never \
 search a whole folder tree at once: list the top level first, pick likely subfolders, and skip \
 dependency and build folders (node_modules, .venv, venv, site-packages, target, dist, build, .git).\n\n\
-{MAC_CONTROL}\n\n{MEMORY_GUIDE}\n\n<user_notes>\n{}\n</user_notes>\n\n<recent_requests>\n{}\n</recent_requests>",
+{MAC_CONTROL}\n\n{SHORTCUTS_GUIDE}\n\n{MEMORY_GUIDE}\n\n<user_notes>\n{}\n</user_notes>\n\n<recent_requests>\n{}\n</recent_requests>",
         if memory.is_empty() { "(none yet)" } else { &memory },
         if recent.is_empty() { "(none yet)" } else { &recent },
     )

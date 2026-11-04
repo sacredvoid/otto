@@ -3,6 +3,7 @@ mod gate;
 mod history;
 mod onboarding;
 mod overlay;
+mod power;
 mod stt;
 mod tasks;
 mod tray;
@@ -121,6 +122,23 @@ fn on_release(app: &AppHandle) {
     });
 }
 
+/// The Mac is going to sleep: drop any half-spoken request and put the island away.
+fn on_sleep(app: &AppHandle) {
+    let otto = app.state::<Otto>();
+    otto.generation.fetch_add(1, Ordering::SeqCst);
+    if otto.recording.lock().unwrap().take().is_some() {
+        println!("[otto] sleeping: dropped an unfinished recording");
+    }
+    pill(app, "idle", None, None);
+    overlay::hide(app);
+}
+
+/// Woke up, or a display came or went: the menu bar may have moved, so re-place the islands.
+fn on_screens_changed(app: &AppHandle) {
+    overlay::place(app);
+    overlay::place_toasts(app);
+}
+
 /// Whisper renders silence as tags like "[BLANK_AUDIO]" or "(wind blowing)".
 fn is_speech(text: &str) -> bool {
     let t = text.trim();
@@ -163,13 +181,13 @@ fn answer_approval(gate: tauri::State<std::sync::Arc<gate::Gate>>, approval_id: 
 }
 
 #[tauri::command]
-fn set_toasts_height(app: AppHandle, height: f64) {
-    overlay::set_toasts_height(&app, height);
+fn set_glass(app: AppHandle, window: tauri::WebviewWindow, rects: Vec<overlay::GlassRect>) {
+    overlay::set_glass(&app, window, rects);
 }
 
 #[tauri::command]
-fn set_chip_size(app: AppHandle, width: f64, height: f64) {
-    overlay::set_chip_size(&app, width, height);
+fn set_toasts_height(app: AppHandle, height: f64) {
+    overlay::set_toasts_height(&app, height);
 }
 
 fn hide_later(app: &AppHandle) {
@@ -188,7 +206,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(Otto::default())
         .manage(tasks::Tasks::default())
-        .invoke_handler(tauri::generate_handler![task_details, open_task_file, show_task_folder, cancel_task, answer_approval, set_toasts_height, set_chip_size,
+        .invoke_handler(tauri::generate_handler![task_details, open_task_file, show_task_folder, cancel_task, answer_approval, set_toasts_height, set_glass,
             onboarding::onboarding_info, onboarding::onboarding_detect, onboarding::mic_status, onboarding::request_mic,
             onboarding::open_settings, onboarding::finish_onboarding, onboarding::detect_connectors,
             onboarding::claude_account, onboarding::claude_login, onboarding::claude_login_code, onboarding::claude_logout,
@@ -218,8 +236,8 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             overlay::place(app.handle());
             overlay::place_toasts(app.handle());
-            overlay::place_chip(app.handle());
             tray::start(app.handle())?;
+            power::start(app.handle(), on_sleep, on_screens_changed);
             updates::start(app.handle());
 
             let asks = app.handle().clone();
@@ -229,6 +247,11 @@ pub fn run() {
                 let _ = asks.emit("otto://approval", ask);
             })?;
             app.manage(gate);
+
+            #[cfg(debug_assertions)]
+            if std::env::var_os("OTTO_DEMO").is_some() {
+                demo(app.handle().clone());
+            }
 
             let handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -268,4 +291,38 @@ pub fn run() {
                 }
             }
         });
+}
+
+/// Dev builds only: `OTTO_DEMO=1 npm run tauri dev` plays fake pill, task and
+/// approval events, so the overlay windows can be checked without speaking.
+#[cfg(debug_assertions)]
+fn demo(app: AppHandle) {
+    use serde_json::json;
+    std::thread::spawn(move || {
+        let wait = |s: f64| std::thread::sleep(Duration::from_secs_f64(s));
+        let pill = |state: &str, text: Option<&str>| {
+            let _ = app.emit("otto://pill", json!({ "state": state, "text": text, "ms": 900, "follow_up": false }));
+        };
+        let task = |id: u64, title: &str, status: &str, step: Option<&str>, summary: Option<&str>, icon: Option<&str>| {
+            let _ = app.emit("otto://task", json!({ "id": id, "title": title, "status": status, "step": step, "summary": summary, "icon": icon }));
+        };
+        wait(3.0);
+        overlay::show(&app);
+        pill("listening", None);
+        wait(3.0);
+        pill("transcribing", None);
+        wait(2.0);
+        pill("heard", Some("Draft a DM for Addie about the launch"));
+        task(901, "Draft a DM for Addie", "running", Some("Reading Slack"), None, Some("app:slack"));
+        task(902, "Summarize the Q3 planning doc", "running", Some("Saving to memory"), None, Some("memory"));
+        wait(3.0);
+        pill("idle", None);
+        overlay::hide(&app);
+        wait(6.0); // both cards tuck into the island
+        let _ = app.emit("otto://approval", json!({ "task_id": 902, "approval_id": 0, "title": "x", "summary": "Send a Slack message",
+            "detail": "to Addie: The launch moved to Thursday, can you update the deck?", "icon": "app:slack" }));
+        wait(5.0);
+        task(901, "Draft a DM for Addie", "done", None, Some("Drafted a DM to Addie in Slack about the Thursday launch. It's saved as a draft, not sent."), None);
+        task(903, "Book a room for Friday", "failed", None, Some("Cancelled."), None);
+    });
 }

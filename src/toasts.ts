@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { renderMarkdown, withoutRecap } from "./markdown";
 import { setLine, toolIcon } from "./icons";
+import { trackGlass } from "./glass";
 
 type Status = "queued" | "running" | "done" | "failed" | "needs_you";
 type TaskEvent = { id: number; title: string; status: Exclude<Status, "needs_you">; step: string | null; summary: string | null; icon: string | null };
@@ -9,10 +10,20 @@ type Approval = { task_id: number; approval_id: number; title: string; summary: 
 type Details = { summary: string; files: string[] };
 
 const DONE_DISMISS_MS = 8000;
+const CANCELLED_DISMISS_MS = 2000;
+const CANCELLED = "Cancelled."; // the summary tasks.rs emits for a cancelled task
+const TUCK_MS = 2500; // a running card shows this long, then condenses into the pill
+const TUCK_ANIM_MS = 260; // matches .tucking in toasts.css
 const stack = document.getElementById("stack")!;
+const pill = document.getElementById("pill")!;
+const wrap = document.getElementById("wrap")!;
+const tuckTimers = new Map<number, number>();
+const latestIcon = new Map<number, string | null>();
 const cards = new Map<number, HTMLElement>();
 const timers = new Map<number, number>();
 const titles = new Map<number, string>();
+// A task can fire several asks at once (parallel tool calls); show them one at a time.
+const approvals = new Map<number, Approval[]>();
 
 const BODY = `M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z`;
 const TIE = `<path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round"/>`;
@@ -50,30 +61,113 @@ function cancelButton(id: number) {
 function getCard(id: number): HTMLElement {
   let card = cards.get(id);
   if (card) return card;
-  card = el("article", "card");
+  card = el("article", "card glass");
   card.innerHTML = `<div class="avatar"><div class="mascot"></div><span class="app-badge"></span></div><div class="body"><p class="title"></p><p class="sub"></p><div class="extra"></div><div class="actions"></div></div>`;
-  const close = button("×", "link", () => remove(id));
+  // Closing a task that is still going tucks it into the pill instead of losing it.
+  const close = button("×", "link", () => (isWorking(card!) ? tuck(id, true) : remove(id)));
   close.className = "close";
   close.setAttribute("aria-label", "Dismiss");
   card.append(close);
   // Hovering pauses the auto-dismiss of a finished task.
-  card.addEventListener("mouseenter", () => clearTimeout(timers.get(id)));
-  card.addEventListener("mouseleave", () => card!.dataset.status === "done" && !card!.dataset.expanded && armDismiss(id));
+  card.addEventListener("mouseenter", () => {
+    clearTimeout(timers.get(id));
+    clearTimeout(tuckTimers.get(id));
+  });
+  card.addEventListener("mouseleave", () => {
+    if (card!.dataset.status === "done" && !card!.dataset.expanded) armDismiss(id);
+    if (card!.dataset.cancelled) armDismiss(id, CANCELLED_DISMISS_MS);
+    if (isWorking(card!) && !card!.classList.contains("tucked")) armTuck(id);
+  });
   stack.prepend(card);
   cards.set(id, card);
   return card;
 }
 
-function armDismiss(id: number) {
+/** Auto-dismiss, unless the card was opened (kept until ×) or is under the cursor right now. */
+function armDismiss(id: number, ms = DONE_DISMISS_MS) {
   clearTimeout(timers.get(id));
-  timers.set(id, window.setTimeout(() => remove(id), DONE_DISMISS_MS));
+  timers.set(id, window.setTimeout(() => {
+    const card = cards.get(id);
+    if (!card || card.dataset.kept) return;
+    // Checked at fire time: hover events don't always reach a panel that never takes focus.
+    if (card.matches(":hover")) return armDismiss(id, 1500);
+    remove(id);
+  }, ms));
 }
 
 function remove(id: number) {
   clearTimeout(timers.get(id));
   timers.delete(id);
+  untuck(id);
+  approvals.delete(id);
+  latestIcon.delete(id);
   cards.get(id)?.remove();
   cards.delete(id);
+  updatePill();
+  report();
+}
+
+const isWorking = (card: HTMLElement) => card.dataset.status === "running" || card.dataset.status === "queued";
+
+function armTuck(id: number) {
+  clearTimeout(tuckTimers.get(id));
+  tuckTimers.set(id, window.setTimeout(() => tuck(id), TUCK_MS));
+}
+
+/** Condense a working card into the pill. */
+function tuck(id: number, now = false) {
+  const card = cards.get(id);
+  if (!card || !isWorking(card) || approvals.get(id)?.length) return;
+  if (!now && card.matches(":hover")) return armTuck(id); // never yank a card from under the cursor
+  clearTimeout(tuckTimers.get(id));
+  card.classList.add("tucking");
+  tuckTimers.set(id, window.setTimeout(() => {
+    card.classList.replace("tucking", "tucked");
+    updatePill();
+    report();
+  }, TUCK_ANIM_MS));
+}
+
+/** Pour a card back out (it needs you, or it finished). */
+function untuck(id: number) {
+  clearTimeout(tuckTimers.get(id));
+  tuckTimers.delete(id);
+  cards.get(id)?.classList.remove("tucking", "tucked");
+  updatePill();
+}
+
+const RING = `<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="rgba(47,111,98,0.18)" stroke-width="2"/><circle class="arc" cx="8" cy="8" r="6" fill="none" stroke="#2F6F62" stroke-width="2" stroke-linecap="round" stroke-dasharray="11 27"/></svg>`;
+
+// The island's parts are built once and updated in place, so step updates
+// never restart its animations.
+const pillMascot = el("span", "pill-mascot");
+pillMascot.innerHTML = MASCOT.running; // static markup
+const pillTitle = el("span", "pill-title");
+const pillIcon = el("span", "pill-icon");
+const pillRing = el("span", "ring");
+pillRing.innerHTML = RING; // static markup
+const pillMore = el("span", "more");
+const pillEnd = el("span", "pill-end");
+pillEnd.append(pillIcon, pillRing, pillMore);
+pill.append(pillMascot, pillTitle, pillEnd);
+
+/** The island: mascot, the newest tucked task's title, its tool's logo, a working ring, +N for the rest. */
+function updatePill() {
+  const tucked = [...cards].filter(([, c]) => c.classList.contains("tucked")).map(([id]) => id);
+  if (!tucked.length) {
+    pill.hidden = true;
+    return;
+  }
+  pill.hidden = false; // un-hiding replays the grow-in
+  const newest = tucked[tucked.length - 1];
+  const icon = latestIcon.get(newest) ?? "";
+  if (pillIcon.dataset.key !== icon) {
+    pillIcon.dataset.key = icon;
+    pillIcon.replaceChildren(...(icon ? [toolIcon(icon)] : []));
+  }
+  pillTitle.textContent = titles.get(newest) ?? "Working";
+  pillMore.textContent = tucked.length > 1 ? `+${tucked.length - 1}` : "";
+  pill.setAttribute("aria-label", `${tucked.length} running`);
 }
 
 /** Connector logos go on the mascot badge; built-in glyphs stay inline. */
@@ -99,13 +193,20 @@ function setStatus(card: HTMLElement, status: Status): boolean {
 }
 
 function render(t: TaskEvent) {
+  const isNew = !cards.has(t.id);
   titles.set(t.id, t.title);
+  if (t.status === "done" || t.status === "failed") approvals.delete(t.id);
+  else if (approvals.get(t.id)?.length) return; // an open ask owns the card until answered
   const card = getCard(t.id);
   card.querySelector(".title")!.textContent = t.title;
   const sub = t.status === "queued" ? "Waiting for a free slot" : t.status === "running" ? (t.step ?? "Working") : (t.summary ?? "");
   setLine(card.querySelector<HTMLElement>(".sub")!, t.status === "running" ? glyphOnly(t.icon) : null, sub);
   setBadge(card, t.status === "running" ? t.icon : null);
-  if (!setStatus(card, t.status)) return; // keep animations smooth between step updates
+  if (t.status === "running" && t.icon) latestIcon.set(t.id, t.icon);
+  if (!setStatus(card, t.status)) {
+    if (card.classList.contains("tucked")) updatePill(); // the pill shows the newest tool
+    return; // keep animations smooth between step updates
+  }
 
   const actions = card.querySelector(".actions")!;
   if (t.status === "done") {
@@ -113,11 +214,22 @@ function render(t: TaskEvent) {
       button("Open", "primary", () => toggleDetails(t.id)),
       button("Show in Finder", "link", () => invoke("show_task_folder", { id: t.id })),
     );
+    untuck(t.id);
     armDismiss(t.id);
   } else if (t.status === "failed") {
+    untuck(t.id);
+    if (t.summary === CANCELLED) {
+      card.dataset.cancelled = "1";
+      return armDismiss(t.id, CANCELLED_DISMISS_MS);
+    }
     actions.append(button("Show in Finder", "link", () => invoke("show_task_folder", { id: t.id })));
   } else {
     actions.append(cancelButton(t.id));
+    // A new task goes straight into the island; hover it for the card.
+    if (isNew) {
+      card.classList.add("tucked");
+      updatePill();
+    } else if (!card.classList.contains("tucked")) armTuck(t.id);
   }
 }
 
@@ -132,6 +244,7 @@ async function toggleDetails(id: number) {
   }
   clearTimeout(timers.get(id));
   card.dataset.expanded = "1";
+  card.dataset.kept = "1"; // opened once: stays until you close it
   const d = await invoke<Details>("task_details", { id });
   const result = el("div", "result");
   result.append(d.summary ? renderMarkdown(withoutRecap(d.summary)) : "No summary.");
@@ -148,6 +261,16 @@ async function toggleDetails(id: number) {
   }
 }
 
+function queueApproval(a: Approval) {
+  const q = approvals.get(a.task_id) ?? [];
+  q.push(a);
+  approvals.set(a.task_id, q);
+  if (q.length === 1) {
+    untuck(a.task_id);
+    renderApproval(a);
+  }
+}
+
 function renderApproval(a: Approval) {
   const card = getCard(a.task_id);
   card.querySelector(".title")!.textContent = titles.get(a.task_id) ?? a.title;
@@ -158,8 +281,13 @@ function renderApproval(a: Approval) {
   card.querySelector(".extra")!.replaceChildren(el("pre", "detail", a.detail));
   const answer = (allow: boolean) => {
     invoke("answer_approval", { approvalId: a.approval_id, allow });
+    const q = approvals.get(a.task_id) ?? [];
+    q.shift();
+    if (q.length) return renderApproval(q[0]);
+    approvals.delete(a.task_id);
     setStatus(card, "running");
     card.querySelector(".actions")!.append(cancelButton(a.task_id));
+    armTuck(a.task_id);
     card.querySelector(".sub")!.textContent = allow ? "Allowed, continuing" : "Skipped, continuing";
   };
   card.querySelector(".actions")!.replaceChildren(
@@ -169,10 +297,25 @@ function renderApproval(a: Approval) {
   );
 }
 
-// The window is sized to its content; height 0 hides it.
-new ResizeObserver(() => {
-  invoke("set_toasts_height", { height: cards.size ? document.documentElement.scrollHeight : 0 });
-}).observe(stack);
+// The window is sized to its content; height 0 hides it. Measured directly after
+// every change too: a hidden window does no layout, so the observer alone never
+// fires for the first task.
+let reported = -1;
+function report() {
+  const height = cards.size ? Math.ceil(wrap.getBoundingClientRect().height) : 0;
+  if (height === reported) return;
+  reported = height;
+  invoke("set_toasts_height", { height });
+}
+new ResizeObserver(report).observe(wrap);
 
-listen<TaskEvent>("otto://task", ({ payload }) => render(payload));
-listen<Approval>("otto://approval", ({ payload }) => renderApproval(payload));
+listen<TaskEvent>("otto://task", ({ payload }) => {
+  render(payload);
+  report();
+});
+listen<Approval>("otto://approval", ({ payload }) => {
+  queueApproval(payload);
+  report();
+});
+
+trackGlass();

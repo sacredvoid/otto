@@ -110,7 +110,7 @@ Original visual style. Not modeled on any specific product's look.
 Three pieces:
 
 ```
-   (top-right stack)                     +---------------------------+
+   (top-center stack)                    +---------------------------+
                                          | done  Q3 hiring deck      |
                                          | 5 slides   [Open] [Show]  |
                                          +---------------------------+
@@ -120,18 +120,18 @@ Three pieces:
                                          | [Approve]  [Deny]  [View] |
                                          +---------------------------+
 
-   (bottom-center pill, while holding hotkey)
+   (under the notch, while holding hotkey)
 
-            (  o  ||||||||||||  listening...  )
-            (  ...  transcribing              )
-            (  +  Got it: "Q3 hiring deck"    )   -> shrinks into the chip
+                     ( o )   listening, ring follows your voice
+                     ( . )   transcribing
+                     ( + )   heard -> stretches into the task island
 
-   (corner chip, idle)        ( 2 running  [ring] )   hover -> task list
+   (under the notch)          ( o [app] 2 running )   hover -> running cards
 ```
 
-1. **Pill.** Shows only while you talk. It has a live mic waveform, then "transcribing", then a one-line "Got it" with the task title, then it shrinks into the chip. Position is configurable (bottom center by default, or top center near the notch). The waveform is the feedback that it actually heard you.
-2. **Chip.** A tiny corner indicator for running tasks: a count plus a progress ring. It hides itself when nothing is running. Hover expands it into the task list, and clicking a task shows its live step log and output files.
-3. **Toasts.** These stack in a corner:
+1. **Listening island.** Shows only while you talk: a small round glass island that drips out of the notch, with a ring that swells with your voice. It hops when it has heard you, then stretches into the task island. A miss or a follow-up shows a line of text instead.
+2. **Notch pill.** A new task's card drops out of the notch, then after about 2.5s condenses into a small pill under the notch: the mascot, the newest tool's logo, and a running count. Hovering the pill pours the running cards back out. A card that needs you or finishes drops back out on its own. It hides when nothing is running.
+3. **Toasts.** These stack under the notch:
    - **Done:** the summary plus Open / Show in Finder. Auto-dismisses after about 6s; hovering pauses it.
    - **Needs approval:** stays until handled. Shows the resolved entities and the original transcript, with Approve / Deny / View.
    - **Failed:** a one-line cause plus Retry / View log.

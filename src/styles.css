@@ -1,4 +1,5 @@
 :root {
+  --spring: linear(0, 0.13 3.6%, 0.44 8.4%, 0.85 15.4%, 1.02 21%, 1.06 25.7%, 1.05 30.5%, 1.01 39.7%, 0.996 50%, 1);
   --ink: #1c2622;
   --muted: #5b6b65;
   --line: #e3ebe7;
@@ -24,9 +25,9 @@ body {
 
 body {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
-  padding-bottom: 16px;
+  padding-top: 0; /* flush with the notch, so the island drips out of it */
   box-sizing: border-box;
 }
 
@@ -34,29 +35,68 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 52px;
+  height: 40px;
   max-width: 520px;
-  padding: 0 20px 0 8px;
+  padding: 0 16px 0 4px;
   box-sizing: border-box;
-  background: #fff;
-  border: 1px solid var(--line);
+  /* Native glass sits behind (glass.ts); this only tints and edges it. */
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 999px;
-  box-shadow: 0 8px 28px rgba(28, 38, 34, 0.12);
-  transition: opacity 160ms ease, transform 160ms ease;
+  box-shadow: 0 8px 28px rgba(28, 38, 34, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transform-origin: top center;
+  transition: opacity 180ms ease, transform 480ms var(--spring), width 480ms var(--spring);
+  --level: 0;
 }
 .pill[data-state="idle"] {
   opacity: 0;
-  transform: translateY(8px) scale(0.98);
+  transform: translateY(-10px) scale(0.6);
 }
+/* Listening, transcribing and heard are a small round island; only a miss needs words. */
+/* A follow-up keeps its words, so you know it went to the last task. */
+.pill:is([data-state="listening"], [data-state="transcribing"], [data-state="heard"]:not([data-follow-up])) {
+  width: 40px;
+  padding: 0;
+  justify-content: center;
+}
+.pill:is([data-state="listening"], [data-state="transcribing"], [data-state="heard"]:not([data-follow-up])) :is(.wave, .label, .detail) {
+  display: none !important;
+}
+/* The ring swells with the mic level. */
+.pill[data-state="listening"] {
+  animation: drip-in 640ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  box-shadow: 0 6px 18px rgba(28, 38, 34, 0.12), 0 0 0 calc(2px + var(--level) * 7px) rgba(140, 201, 178, 0.45);
+  transition: opacity 180ms ease, transform 480ms var(--spring), box-shadow 90ms linear;
+}
+/* Heard: a happy hop, then it hands over to the task island. */
 .pill[data-state="heard"] {
-  background: var(--mint-soft);
-  border-color: transparent;
+  background: rgba(191, 229, 210, 0.4);
+  border-color: rgba(221, 241, 230, 0.7);
+  animation: hand-off 300ms cubic-bezier(0.5, 0, 0.75, 0) 520ms forwards;
+}
+/* Stretches sideways as it fades, into the task island growing in the same spot. */
+@keyframes hand-off {
+  to { opacity: 0; transform: scale(3, 0.92); filter: blur(4px); }
+}
+/* Drips out of the camera: a dark drop that falls, lands, and turns to glass. */
+@keyframes drip-in {
+  0% { opacity: 1; transform: translateY(-100%) scale(0.35, 0.6); background-color: rgba(0, 0, 0, 0.92); border-color: transparent; }
+  35% { opacity: 1; transform: translateY(6%) scale(0.7, 1.18); background-color: rgba(0, 0, 0, 0.7); border-color: transparent; }
+  60% { opacity: 1; transform: translateY(0) scale(1.08, 0.9); }
+  80% { opacity: 1; transform: scale(0.97, 1.03); }
+  100% { opacity: 1; transform: none; }
+}
+.mascot {
+  animation: mascot-in 360ms var(--spring) 260ms both;
+}
+@keyframes mascot-in {
+  from { opacity: 0; transform: scale(0.6); }
 }
 
 .mascot {
   display: none;
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
   flex: none;
 }
 .pill[data-state="listening"] .for-listening,
@@ -115,5 +155,5 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pill { transition: none; }
+  .pill { transition: none; animation: none !important; }
 }

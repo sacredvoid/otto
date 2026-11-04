@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { trackGlass } from "./glass";
 
 type PillState = "idle" | "listening" | "transcribing" | "heard" | "miss";
 type Pill = { state: PillState; text: string | null; ms: number | null; follow_up: boolean };
@@ -27,6 +28,7 @@ function clip(s: string, n = 52) {
 
 listen<Pill>("otto://pill", ({ payload }) => {
   pill.dataset.state = payload.state;
+  pill.toggleAttribute("data-follow-up", payload.follow_up);
   label.textContent = payload.follow_up ? "Following up" : LABELS[payload.state];
   if (payload.state === "heard" && payload.text) {
     detail.textContent = `"${clip(payload.text)}"`;
@@ -39,8 +41,11 @@ listen<Pill>("otto://pill", ({ payload }) => {
 });
 
 listen<number>("otto://level", ({ payload: level }) => {
+  pill.style.setProperty("--level", Math.min(1, level * 1.6).toFixed(2));
   bars.forEach((b, i) => {
     const jitter = 0.75 + Math.random() * 0.5;
     b.style.height = `${Math.max(3, Math.min(22, 3 + level * 22 * shape[i] * jitter))}px`;
   });
 });
+
+trackGlass();

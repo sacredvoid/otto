@@ -1,6 +1,6 @@
 [package]
 name = "otto"
-version = "0.3.3"
+version = "0.4.0"
 description = "Your always-on assistant for the busywork on your Mac."
 authors = ["Samanvya Tripathi"]
 edition = "2024"
@@ -41,3 +41,4 @@ tauri-plugin-global-shortcut = "2"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 block2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry", "NSString"] }

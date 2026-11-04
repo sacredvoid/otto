@@ -83,6 +83,8 @@ struct TaskCtx {
     web_ok: bool,
     /// Tools and servers switched off in setup ("disabled" in config.json).
     disabled: Vec<String>,
+    /// Memory saves ask every time ("ask_memory" in config.json). Off by default.
+    ask_memory: bool,
 }
 
 pub struct Gate {
@@ -128,9 +130,9 @@ impl Gate {
         format!("http://127.0.0.1:{}/mcp/{}/{}", self.port, self.token, task_id)
     }
 
-    pub fn register(&self, task_id: u64, dir: &Path, title: &str, readable: Vec<PathBuf>, allow: Vec<String>, disabled: Vec<String>) {
+    pub fn register(&self, task_id: u64, dir: &Path, title: &str, readable: Vec<PathBuf>, allow: Vec<String>, disabled: Vec<String>, ask_memory: bool) {
         let dir = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
-        let ctx = TaskCtx { dir, title: title.into(), readable, allow, disabled, ..Default::default() };
+        let ctx = TaskCtx { dir, title: title.into(), readable, allow, disabled, ask_memory, ..Default::default() };
         self.tasks.lock().unwrap().insert(task_id, ctx);
     }
 
@@ -430,9 +432,9 @@ fn classify(ctx: &TaskCtx, tool: &str, input: &Value) -> Verdict {
         // Otto's own read-only Spotlight search, confined to the readable folders.
         "TodoWrite" | "mcp__otto__find_files" => Verdict::Allow,
         t if is_read_only_connector(t) || ctx.allow.iter().any(|a| a == t) => Verdict::Allow,
-        // Saving a memory shapes every later task, so a task that read untrusted text must ask.
-        "mcp__otto__remember" if !ctx.tainted => Verdict::Allow,
-        "mcp__otto__remember" => ask("Save to Otto's memory (this task has read your files)", s("fact")),
+        // Automatic by default; setup can switch memory saves to ask every time.
+        "mcp__otto__remember" if ctx.ask_memory => ask("Save to Otto's memory", s("fact")),
+        "mcp__otto__remember" => Verdict::Allow,
         "Write" | "Edit" | "MultiEdit" | "NotebookEdit" => {
             let path = s("file_path");
             let p = Path::new(&path);
@@ -610,7 +612,10 @@ mod tests {
         assert_eq!(classify(&c, "mcp__mem__search", &json!({})), Verdict::Allow);
         assert_eq!(classify(&c, "mcp__otto__remember", &json!({ "fact": "x" })), Verdict::Allow);
         c.tainted = true;
-        assert!(is_ask(&classify(&c, "mcp__otto__remember", &json!({ "fact": "x" }))), "tainted memory writes ask");
+        assert_eq!(classify(&c, "mcp__otto__remember", &json!({ "fact": "x" })), Verdict::Allow, "memory is automatic by default");
+        c.ask_memory = true;
+        assert!(is_ask(&classify(&c, "mcp__otto__remember", &json!({ "fact": "x" }))), "ask_memory makes memory writes ask");
+        c.ask_memory = false;
         assert!(is_ask(&classify(&c, "WebSearch", &json!({ "query": "x" }))));
         c.web_ok = true;
         c.disabled = vec!["mcp__claude_ai_Gmail".into()];
@@ -645,7 +650,7 @@ mod tests {
         let (c, root) = ctx();
         let (tx, rx) = mpsc::channel::<Ask>();
         let gate = Gate::start(&root.join("audit.jsonl"), move |a| tx.send(a).unwrap()).unwrap();
-        gate.register(1, &c.dir, "e2e", vec![], vec![], vec![]);
+        gate.register(1, &c.dir, "e2e", vec![], vec![], vec![], false);
         let url = if answer.is_some() { gate.url(1) } else { "http://127.0.0.1:9/mcp/nope/1".into() };
         let g = gate.clone();
         let asks = std::thread::spawn(move || {

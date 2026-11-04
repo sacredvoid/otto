@@ -11,14 +11,14 @@ export default defineConfig(() => ({
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
   // Every window's page lives in src/ next to its script and styles; the build lands in dist/.
-  // Pages: pill (index.html), task cards, corner chip, onboarding, history.
+  // Pages: pill (index.html), task cards (and the running pill), onboarding, history.
   root: "src",
   build: {
     outDir: "../dist",
     emptyOutDir: true,
     rollupOptions: {
       input: Object.fromEntries(
-        ["index", "toasts", "chip", "onboarding", "history"].map((p) => [p, new URL(`./src/${p}.html`, import.meta.url).pathname]),
+        ["index", "toasts", "onboarding", "history"].map((p) => [p, new URL(`./src/${p}.html`, import.meta.url).pathname]),
       ),
     },
   },

@@ -1,4 +1,7 @@
 :root {
+  /* A spring with a soft overshoot, like the system island. */
+  --spring: linear(0, 0.13 3.6%, 0.44 8.4%, 0.85 15.4%, 1.02 21%, 1.06 25.7%, 1.05 30.5%, 1.01 39.7%, 0.996 50%, 1);
+  --settle: cubic-bezier(0.32, 0.72, 0, 1);
   --ink: #1c2622;
   --ink-2: #3a4a44;
   --muted: #5b6b65;
@@ -18,23 +21,149 @@ body {
   cursor: default;
 }
 
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 12px 16px; /* flush with the notch; room for card shadows below */
+}
 .stack {
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 8px 12px 16px; /* room for card shadows inside the window */
 }
+.pill:not([hidden]) + .stack:has(.card:not(.tucked)),
+.wrap:hover .pill:not([hidden]) + .stack {
+  margin-top: 10px;
+}
+
+/* A running card condenses into this pill; hovering the pill pours them back out. */
+/* Island: hangs right under the notch, wider than tall, glass behind. */
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 240px;
+  max-width: 340px;
+  height: 36px;
+  padding: 0 10px 0 6px;
+  box-sizing: border-box;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 6px 18px rgba(28, 38, 34, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  font-weight: 500;
+  transform-origin: top center;
+  animation: pill-in 700ms cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+.pill[hidden] {
+  display: none;
+}
+.pill-mascot svg {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: block;
+}
+.pill-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pill-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.pill .tool-icon {
+  margin-right: 0;
+}
+.ring svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+.ring .arc {
+  transform-origin: 8px 8px;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.more {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(47, 111, 98, 0.12);
+  color: var(--teal-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+/* A droplet out of the camera: dark like the notch, it falls and stretches,
+   lands, spreads into glass, and settles. */
+@keyframes pill-in {
+  0% { transform: translateY(-100%) scale(0.12, 0.7); background-color: rgba(0, 0, 0, 0.92); border-color: transparent; box-shadow: none; }
+  32% { transform: translateY(5%) scale(0.16, 1.18); background-color: rgba(0, 0, 0, 0.78); border-color: transparent; }
+  58% { transform: translateY(0) scale(1.05, 0.9); background-color: rgba(255, 255, 255, 0.22); }
+  78% { transform: scale(0.985, 1.025); }
+  100% { transform: none; }
+}
+.pill > * {
+  animation: content-in 320ms var(--settle) 400ms both;
+}
+.pill > :nth-child(3) {
+  animation-delay: 460ms;
+}
+@keyframes content-in {
+  from { opacity: 0; transform: translateY(3px); filter: blur(4px); }
+}
+/* Condenses up into the island. */
+.card.tucking {
+  animation: tuck 300ms var(--settle) forwards;
+}
+@keyframes tuck {
+  to { opacity: 0; transform: translateY(-50%) scale(0.5, 0.2); filter: blur(6px); }
+}
+/* Tucked cards pour out of the island on hover, staggered, and slide back up on leave. */
+.card.tucked {
+  display: none;
+  opacity: 0;
+  transform: translateY(-14px) scale(0.96);
+  animation: none;
+  transition: opacity 180ms ease, transform 320ms var(--settle), display 320ms allow-discrete;
+}
+.wrap:hover .card.tucked {
+  display: flex;
+  opacity: 1;
+  transform: none;
+  transition: opacity 220ms ease, transform 460ms var(--spring), display 0s allow-discrete;
+}
+@starting-style {
+  .wrap:hover .card.tucked {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.96);
+  }
+}
+.wrap:hover .card.tucked:nth-child(2) { transition-delay: 40ms; }
+.wrap:hover .card.tucked:nth-child(3) { transition-delay: 80ms; }
+.wrap:hover .card.tucked:nth-child(n + 4) { transition-delay: 120ms; }
 
 .card {
   position: relative;
   display: flex;
   gap: 12px;
   padding: 14px 36px 14px 14px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: 0 6px 20px rgba(28, 38, 34, 0.08);
-  animation: enter 180ms ease-out;
+  /* Native glass sits behind (glass.ts); this only tints and edges it. */
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(28, 38, 34, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transform-origin: top center;
+  animation: enter 520ms var(--spring);
 }
 .card[data-status="failed"] {
   border-color: var(--rose-line);
@@ -153,20 +282,23 @@ body {
   cursor: pointer;
 }
 .close:hover {
-  background: #f3f7f5;
+  background: rgba(255, 255, 255, 0.5);
 }
 
+/* Drops out of the notch: the window's top edge clips it until it slides down. */
 @keyframes enter {
-  from { opacity: 0; transform: translateY(-6px); }
+  from { opacity: 0; transform: translateY(-110%) scaleX(0.55); filter: blur(6px); }
+  40% { opacity: 1; filter: blur(0); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .card { animation: none; }
+  .card, .pill, .pill > *, .card.tucking, .ring .arc { animation: none; }
+  .card.tucked, .wrap:hover .card.tucked { transition: none; }
 }
 
 /* Needs-you card: soft blue, like the mockup */
 .card[data-status="needs_you"] {
-  background: #f5f9fd;
-  border-color: #cfe0ef;
+  background: rgba(214, 232, 247, 0.45);
+  border-color: rgba(207, 224, 239, 0.85);
 }
 .solid {
   height: 30px;
@@ -198,7 +330,7 @@ body {
   max-height: 120px;
   overflow: auto;
   border-radius: 8px;
-  background: #e8f0f7;
+  background: rgba(232, 240, 247, 0.7);
   font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   line-height: 1.45;
@@ -244,7 +376,7 @@ body {
 .result code {
   font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
-  background: #f3f7f5;
+  background: rgba(243, 247, 245, 0.7);
   border-radius: 6px;
 }
 .result pre {
@@ -272,4 +404,11 @@ body {
 .files .link {
   color: var(--teal-ink);
   text-align: left;
+}
+.more:empty,
+.pill-icon:empty {
+  display: none;
+}
+.pill-icon {
+  display: flex;
 }

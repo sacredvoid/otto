@@ -1,10 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-type Info = { model_ready: boolean; folders: string[]; disabled: string[]; plugins: string[] };
+type Info = { model_ready: boolean; folders: string[]; disabled: string[]; plugins: string[]; ask_memory: boolean };
 type Server = { key: string; name: string; tools: string[] };
-/** One switch. `off` is what goes in config "disabled" when it is switched off. */
-type Cap = { name: string; what: string; asks: string; off: string[] | null };
+/** One switch. `off` is what goes in config "disabled" when it is switched off. `askable` swaps the tag for an Automatic / Ask picker. */
+type Cap = { name: string; what: string; asks: string; off: string[] | null; askable?: true };
 type Detected = { claude: boolean; codex: boolean; gemini: boolean; ollama: boolean };
 type Account = { installed: boolean; logged_in: boolean; email: string | null; method: string | null };
 
@@ -18,6 +18,7 @@ let folders: string[] = [];
 const chosen = new Set<string>();
 const disabled = new Set<string>();
 let plugins: string[] = [];
+let askMemory = false;
 let servers: Server[] | string | null = null; // null = still checking, string = error
 let micTimer: number | undefined;
 
@@ -78,14 +79,21 @@ const BUILT_IN: Cap[] = [
   { name: "Run commands and control Mac apps", what: "Shell commands, AppleScript, Shortcuts and screenshots.", asks: "Asks every time", off: ["Bash"] },
   { name: "Web search and web pages", what: "Looks things up online.", asks: "Asks once a task has read your files", off: ["WebSearch", "WebFetch"] },
   { name: "Spotlight search", what: "Finds files fast, only inside your picked folders.", asks: "Automatic", off: ["mcp__otto__find_files"] },
-  { name: "Memory", what: "Saves short notes about you to ~/Otto/memory.md.", asks: "Automatic", off: ["mcp__otto__remember"] },
+  { name: "Memory", what: "Saves short notes about you to ~/Otto/memory.md.", asks: "Automatic", off: ["mcp__otto__remember"], askable: true },
 ];
 
 function capRow(c: Cap) {
   const row = el("div", "cap");
   const text = el("div", "grow");
   text.append(el("span", "name", c.name), el("span", "muted small", c.what));
-  const tag = el("span", "tag", c.asks);
+  let tag: HTMLElement = el("span", "tag", c.asks);
+  if (c.askable) {
+    const pick = el("select", "tag");
+    pick.setAttribute("aria-label", `When ${c.name} asks`);
+    pick.append(new Option("Automatic", "auto", false, !askMemory), new Option("Asks every time", "ask", false, askMemory));
+    pick.addEventListener("change", () => (askMemory = pick.value === "ask"));
+    tag = pick;
+  }
   row.append(text, tag);
   if (!c.off) return row;
   const off = c.off;
@@ -245,7 +253,7 @@ next.addEventListener("click", async () => {
   if (step < LAST) return show(step + 1);
   next.disabled = true;
   try {
-    await invoke("finish_onboarding", { readableDirs: [...chosen], disabled: [...disabled] });
+    await invoke("finish_onboarding", { readableDirs: [...chosen], disabled: [...disabled], askMemory });
   } catch (e) {
     $("error").textContent = String(e);
     $("error").hidden = false;
@@ -272,6 +280,7 @@ listen<{ state: string; text: string | null }>("otto://pill", (e) => {
   renderFolders();
   info.disabled.forEach((d) => disabled.add(d));
   plugins = info.plugins;
+  askMemory = info.ask_memory;
   renderCaps();
   renderAis(await invoke<Detected>("onboarding_detect"));
   renderAccount();

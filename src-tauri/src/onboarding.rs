@@ -25,6 +25,25 @@ fn read_config() -> Map<String, Value> {
         .unwrap_or_default()
 }
 
+/// Sets one key in ~/Otto/config.json, keeping the rest. Atomic: write, then rename.
+pub fn set_config(key: &str, value: Value) {
+    let mut config = read_config();
+    config.insert(key.into(), value);
+    if let Err(e) = write_config(&config) {
+        eprintln!("[otto] {e}");
+    }
+}
+
+fn write_config(config: &Map<String, Value>) -> Result<(), String> {
+    let path = config_path();
+    std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
+    let tmp = path.with_extension("json.tmp");
+    let body = serde_json::to_vec_pretty(config).map_err(|e| e.to_string())?;
+    std::fs::write(&tmp, body)
+        .and_then(|_| std::fs::rename(&tmp, &path))
+        .map_err(|e| format!("could not save settings: {e}"))
+}
+
 pub fn is_onboarded() -> bool {
     read_config().get("onboarded") == Some(&Value::Bool(true))
 }
@@ -49,6 +68,8 @@ pub struct Info {
     disabled: Vec<String>,
     /// Plugins named in config.json ("plugins").
     plugins: Vec<String>,
+    /// Memory saves ask every time ("ask_memory").
+    ask_memory: bool,
 }
 
 #[tauri::command]
@@ -73,7 +94,7 @@ pub fn onboarding_info() -> Info {
     let list = |k: &str| -> Vec<String> {
         config[k].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect()).unwrap_or_default()
     };
-    Info { model_ready: crate::stt::default_model_path().is_file(), folders, disabled: list("disabled"), plugins: list("plugins") }
+    Info { model_ready: crate::stt::default_model_path().is_file(), folders, disabled: list("disabled"), plugins: list("plugins"), ask_memory: config["ask_memory"] == true }
 }
 
 #[derive(Serialize)]
@@ -214,7 +235,7 @@ pub async fn detect_connectors() -> Result<Vec<Server>, String> {
 
 /// Saves the choices, keeping any other keys, then closes the window.
 #[tauri::command]
-pub fn finish_onboarding(app: AppHandle, readable_dirs: Vec<String>, disabled: Vec<String>) -> Result<(), String> {
+pub fn finish_onboarding(app: AppHandle, readable_dirs: Vec<String>, disabled: Vec<String>, ask_memory: bool) -> Result<(), String> {
     let home = home();
     // Only "~/Name" folders that exist; the webview is not trusted to name paths.
     let dirs: Vec<&String> = readable_dirs
@@ -233,14 +254,9 @@ pub fn finish_onboarding(app: AppHandle, readable_dirs: Vec<String>, disabled: V
     let mut config = read_config();
     config.insert("readable_dirs".into(), json!(dirs));
     config.insert("disabled".into(), json!(disabled));
+    config.insert("ask_memory".into(), json!(ask_memory));
     config.insert("onboarded".into(), json!(true));
-    let path = config_path();
-    std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
-    let tmp = path.with_extension("json.tmp");
-    let body = serde_json::to_vec_pretty(&config).map_err(|e| e.to_string())?;
-    std::fs::write(&tmp, body)
-        .and_then(|_| std::fs::rename(&tmp, &path))
-        .map_err(|e| format!("could not save settings: {e}"))?;
+    write_config(&config)?;
     if let Some(w) = app.get_webview_window("onboarding") {
         let _ = w.hide();
     }
