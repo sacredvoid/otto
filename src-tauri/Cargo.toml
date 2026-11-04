@@ -1,6 +1,6 @@
 [package]
 name = "otto"
-version = "0.4.0"
+version = "0.4.1"
 description = "Your always-on assistant for the busywork on your Mac."
 authors = ["Samanvya Tripathi"]
 edition = "2024"
