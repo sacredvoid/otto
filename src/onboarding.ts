@@ -6,6 +6,7 @@ type Server = { key: string; name: string; tools: string[] };
 /** One switch. `off` is what goes in config "disabled" when it is switched off. */
 type Cap = { name: string; what: string; asks: string; off: string[] | null };
 type Detected = { claude: boolean; codex: boolean; gemini: boolean; ollama: boolean };
+type Account = { installed: boolean; logged_in: boolean; email: string | null; method: string | null };
 
 const LAST = 6;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -149,6 +150,55 @@ function renderAis(d: Detected) {
   });
 }
 
+function button(text: string, cls: string, onClick: () => void) {
+  const b = el("button", cls, text);
+  b.type = "button";
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+/** "Sign in" runs the CLI's own login. The token stays in the Keychain, owned by Claude Code. */
+async function renderAccount(waiting = false, error = "") {
+  const box = $("account");
+  if (waiting) {
+    const code = el("input");
+    code.placeholder = "Browser showing a code? Paste it here";
+    code.setAttribute("aria-label", "Sign-in code");
+    const send = button("Send", "ghost", () =>
+      invoke("claude_login_code", { code: code.value }).catch((e) => renderAccount(true, String(e))),
+    );
+    code.addEventListener("keydown", (e) => e.key === "Enter" && send.click());
+    const msg = el("p", "muted", "Finish signing in in your browser. This updates automatically.");
+    box.replaceChildren(msg, code, send, ...(error ? [el("p", "error", error)] : []));
+    return;
+  }
+  const a = await invoke<Account>("claude_account");
+  const signIn = (label: string, cls: string) =>
+    button(label, cls, () =>
+      invoke("claude_login")
+        .then(() => renderAccount(true))
+        .catch((e) => renderAccount(false, String(e))),
+    );
+  const err = error ? [el("p", "error", error)] : [];
+  if (!a.installed) {
+    box.replaceChildren(
+      el("p", "", "Claude Code isn't installed. In Terminal, run: curl -fsSL https://claude.ai/install.sh | bash"),
+      button("Check again", "ghost", async () => {
+        renderAis(await invoke<Detected>("onboarding_detect"));
+        renderAccount();
+      }),
+      ...err,
+    );
+  } else if (!a.logged_in) {
+    box.replaceChildren(el("p", "", "Sign in with your Claude account. Otto uses your plan, no API key needed."), signIn("Sign in to Claude", "ghost"), ...err);
+  } else {
+    const who = a.email ?? "your Claude account";
+    box.replaceChildren(el("p", "", `Signed in as ${who}.`), signIn("Use a different account", "quiet"), ...err);
+  }
+}
+
+listen<string | null>("otto://claude-login", (e) => renderAccount(false, e.payload ?? ""));
+
 back.addEventListener("click", () => step > 1 && show(step - 1));
 next.addEventListener("click", async () => {
   if (step < LAST) return show(step + 1);
@@ -188,4 +238,5 @@ listen<{ state: string; text: string | null }>("otto://pill", (e) => {
     .catch((e) => (servers = String(e)))
     .finally(renderCaps);
   renderAis(await invoke<Detected>("onboarding_detect"));
+  renderAccount();
 })();

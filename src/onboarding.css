@@ -340,3 +340,27 @@ input.switch:checked::after {
 .cap .tag:last-child {
   margin-right: 48px;
 }
+
+.account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 16px;
+  font-size: 14px;
+}
+.account p {
+  margin: 0;
+  flex-basis: 100%;
+}
+.account input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  background: transparent;
+  color: inherit;
+}

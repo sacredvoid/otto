@@ -292,3 +292,79 @@ mod mac {
         }
     }
 }
+
+/// Who the claude CLI is signed in as. Otto never sees the token: the CLI
+/// keeps it in the macOS Keychain and every task runs through the CLI.
+#[derive(Serialize, Default)]
+pub struct Account {
+    installed: bool,
+    logged_in: bool,
+    email: Option<String>,
+    method: Option<String>,
+}
+
+#[tauri::command]
+pub async fn claude_account() -> Account {
+    let Some(bin) = crate::tasks::claude_bin() else { return Account::default() };
+    let out = Command::new(bin).args(["auth", "status"]).env_remove("CLAUDE_CODE_PLUGIN_DIRS").output();
+    let v: Value = out.ok().and_then(|o| serde_json::from_slice(&o.stdout).ok()).unwrap_or_default();
+    let s = |k: &str| v[k].as_str().map(String::from);
+    Account { installed: true, logged_in: v["loggedIn"] == true, email: s("email"), method: s("authMethod") }
+}
+
+/// stdin of the running `claude auth login`, for the paste-a-code fallback.
+static LOGIN: std::sync::Mutex<Option<std::process::ChildStdin>> = std::sync::Mutex::new(None);
+
+/// Starts the CLI's own sign-in: it opens the browser and listens on localhost,
+/// so most people never paste anything. Emits otto://claude-login with
+/// null on success or the CLI's error line.
+#[tauri::command]
+pub fn claude_login(app: AppHandle) -> Result<(), String> {
+    use std::io::BufRead;
+    use std::process::Stdio;
+    use tauri::Emitter;
+    let bin = crate::tasks::claude_bin().ok_or("Claude Code isn't installed")?;
+    let mut slot = LOGIN.lock().map_err(|_| "login state poisoned")?;
+    if slot.is_some() {
+        return Ok(()); // already waiting on the browser
+    }
+    let mut child = Command::new(bin)
+        .args(["auth", "login", "--claudeai"])
+        .env_remove("CLAUDE_CODE_PLUGIN_DIRS")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("couldn't start claude: {e}"))?;
+    *slot = child.stdin.take();
+    let stdout = child.stdout.take();
+    std::thread::spawn(move || {
+        let mut last = String::new();
+        if let Some(out) = stdout {
+            for line in std::io::BufReader::new(out).lines().map_while(Result::ok) {
+                if line.contains("failed") || line.contains("rror") {
+                    last = line;
+                }
+            }
+        }
+        let ok = child.wait().map(|s| s.success()).unwrap_or(false);
+        if let Ok(mut s) = LOGIN.lock() {
+            *s = None;
+        }
+        let err = (!ok).then(|| if last.is_empty() { "Sign-in didn't finish.".to_string() } else { last.replace("Login failed: ", "") });
+        let _ = app.emit("otto://claude-login", err);
+    });
+    Ok(())
+}
+
+/// The browser sometimes shows a code instead of finishing by itself.
+#[tauri::command]
+pub fn claude_login_code(code: String) -> Result<(), String> {
+    let code = code.trim();
+    if code.is_empty() || code.len() > 512 || code.contains(['\n', '\r']) {
+        return Err("That doesn't look like a sign-in code.".into());
+    }
+    let mut slot = LOGIN.lock().map_err(|_| "login state poisoned")?;
+    let stdin = slot.as_mut().ok_or("Click Sign in first.")?;
+    writeln!(stdin, "{code}").map_err(|e| e.to_string())
+}
