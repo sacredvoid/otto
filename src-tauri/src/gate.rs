@@ -19,21 +19,30 @@ pub const APPROVAL_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 /// we assume the task may have seen private data.
 const SEEN_WAIT: Duration = Duration::from_secs(2);
 
-/// Connector tools that only read. They run without asking but taint the task,
-/// so anything outbound afterwards still asks. Writes (send, create, delete) always ask.
-const READ_ONLY_CONNECTOR_TOOLS: [&str; 11] = [
-    "mcp__claude_ai_Gmail__search_threads",
-    "mcp__claude_ai_Gmail__get_thread",
-    "mcp__claude_ai_Gmail__get_message",
-    "mcp__claude_ai_Gmail__list_labels",
-    "mcp__claude_ai_Gmail__list_drafts",
-    "mcp__claude_ai_Gmail__get_draft",
-    "mcp__claude_ai_Google_Calendar__list_calendars",
-    "mcp__claude_ai_Google_Calendar__list_events",
-    "mcp__claude_ai_Google_Calendar__get_event",
-    "mcp__claude_ai_Google_Calendar__search_events",
-    "mcp__claude_ai_Google_Calendar__suggest_time",
+/// claude.ai connector tools that only read, judged by name since the gate
+/// doesn't see MCP annotations. Read-only means a read verb near the start
+/// ("search_threads", "slack_read_channel", "notion-fetch") and no word that
+/// changes anything. Unknown shapes fall through to asking. They run without
+/// asking but taint the task, so anything outbound afterwards still asks.
+const READ_VERBS: [&str; 13] =
+    ["get", "list", "search", "read", "fetch", "find", "query", "describe", "view", "lookup", "show", "count", "suggest"];
+const WRITE_WORDS: [&str; 54] = [
+    "send", "create", "update", "delete", "remove", "trash", "untrash", "archive", "post", "write", "edit", "set",
+    "add", "move", "mark", "unmark", "label", "unlabel", "reply", "forward", "respond", "invite", "share", "upload",
+    "modify", "apply", "cancel", "schedule", "publish", "comment", "react", "approve", "assign", "close", "merge",
+    "rename", "copy", "import", "run", "execute", "invoke", "trigger", "start", "stop", "submit", "save", "patch",
+    "put", "insert", "replace", "clear", "accept", "decline", "spam",
 ];
+
+pub(crate) fn is_read_only_connector(tool: &str) -> bool {
+    let Some(name) = tool.strip_prefix("mcp__claude_ai_").and_then(|r| r.split_once("__")).map(|(_, n)| n) else {
+        return false;
+    };
+    let words: Vec<String> = name.split(['_', '-']).filter(|w| !w.is_empty()).map(str::to_ascii_lowercase).collect();
+    // The verb may follow the app's name ("slack_read_channel").
+    words.iter().take(2).any(|w| READ_VERBS.contains(&w.as_str())) && !words.iter().any(|w| WRITE_WORDS.contains(&w.as_str()))
+}
+
 
 const REMEMBER_MAX: usize = 500;
 
@@ -419,7 +428,7 @@ fn classify(ctx: &TaskCtx, tool: &str, input: &Value) -> Verdict {
     match tool {
         // Otto's own read-only Spotlight search, confined to the readable folders.
         "TodoWrite" | "mcp__otto__find_files" => Verdict::Allow,
-        t if READ_ONLY_CONNECTOR_TOOLS.contains(&t) || ctx.allow.iter().any(|a| a == t) => Verdict::Allow,
+        t if is_read_only_connector(t) || ctx.allow.iter().any(|a| a == t) => Verdict::Allow,
         // Saving a memory shapes every later task, so a task that read untrusted text must ask.
         "mcp__otto__remember" if !ctx.tainted => Verdict::Allow,
         "mcp__otto__remember" => ask("Save to Otto's memory (this task has read your files)", s("fact")),
@@ -584,6 +593,17 @@ mod tests {
         assert_eq!(classify(&c, "mcp__otto__find_files", &json!({ "query": "x" })), Verdict::Allow);
         assert_eq!(classify(&c, "mcp__claude_ai_Gmail__search_threads", &json!({})), Verdict::Allow);
         assert!(is_ask(&classify(&c, "mcp__claude_ai_Gmail__send_message", &json!({ "to": "m@x.com" }))), "sends ask");
+        for t in ["mcp__claude_ai_Gmail__get_thread", "mcp__claude_ai_Google_Calendar__list_events", "mcp__claude_ai_Google_Calendar__suggest_time",
+                  "mcp__claude_ai_Slack__slack_read_channel", "mcp__claude_ai_Slack__slack_search_public", "mcp__claude_ai_Notion__notion-fetch"] {
+            assert_eq!(classify(&c, t, &json!({})), Verdict::Allow, "{t} reads");
+        }
+        for t in ["mcp__claude_ai_Gmail__create_draft", "mcp__claude_ai_Gmail__trash_thread", "mcp__claude_ai_Gmail__label_thread",
+                  "mcp__claude_ai_Google_Calendar__create_event", "mcp__claude_ai_Google_Calendar__respond_to_event",
+                  "mcp__claude_ai_Slack__slack_send_message", "mcp__claude_ai_Slack__slack_schedule_message",
+                  "mcp__claude_ai_Notion__notion-update-page", "mcp__claude_ai_X__search_and_replace", "mcp__claude_ai_X__get_or_create",
+                  "mcp__claude_ai_X__do_thing", "mcp__claude_ai_Gmail", "mcp__someserver__search", "mcp__plugin_x_y__list_items"] {
+            assert!(is_ask(&classify(&c, t, &json!({}))), "{t} asks");
+        }
         assert!(is_ask(&classify(&c, "mcp__mem__search", &json!({}))));
         c.allow = vec!["mcp__mem__search".into()];
         assert_eq!(classify(&c, "mcp__mem__search", &json!({})), Verdict::Allow);
