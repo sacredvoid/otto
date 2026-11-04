@@ -191,7 +191,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![task_details, open_task_file, show_task_folder, cancel_task, answer_approval, set_toasts_height, set_chip_size,
             onboarding::onboarding_info, onboarding::onboarding_detect, onboarding::mic_status, onboarding::request_mic,
             onboarding::open_settings, onboarding::finish_onboarding, onboarding::detect_connectors,
-            onboarding::claude_account, onboarding::claude_login, onboarding::claude_login_code,
+            onboarding::claude_account, onboarding::claude_login, onboarding::claude_login_code, onboarding::claude_logout,
             history::list_history, history::history_detail, history::open_history_file, history::show_history_folder])
         // Onboarding and History are reopened later from the tray, so closing only hides them.
         .on_window_event(|window, event| {
@@ -244,6 +244,15 @@ pub fn run() {
             });
             if !onboarding::is_onboarded() {
                 onboarding::show_onboarding(app.handle());
+            } else {
+                // Set up before Otto had its own sign-in (or signed out since): ask once at launch.
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    if !onboarding::account().logged_in() {
+                        let h = handle.clone();
+                        let _ = handle.run_on_main_thread(move || onboarding::show_onboarding(&h));
+                    }
+                });
             }
             println!("[otto] hold Ctrl+Option+Space to talk");
             Ok(())

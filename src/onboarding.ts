@@ -110,13 +110,13 @@ function renderCaps() {
     servers === null
       ? [el("p", "muted small", "Checking your Claude account\u2026")]
       : typeof servers === "string"
-        ? [el("p", "muted small", `Couldn't check connectors: ${servers}`)]
+        ? [el("p", "muted small", servers)]
         : servers.length
           ? servers.map((s) =>
               capRow({ name: s.name, what: `${s.tools.length} tools: ${s.tools.slice(0, 4).join(", ")}${s.tools.length > 4 ? "\u2026" : ""}`, asks: "Reading is automatic; changes ask", off: [s.key] }),
             )
           : [el("p", "muted small", "No connectors on this Claude account. Add them at claude.ai, Settings, Connectors.")];
-  const groups = [group("Built in", ...BUILT_IN.map(capRow)), group("From your Claude account", ...connectors)];
+  const groups = [group("Built in", ...BUILT_IN.map(capRow)), group("From your Claude account", ...(account ? [el("p", "muted small", `Signed in as ${account}`)] : []), ...connectors)];
   if (plugins.length) {
     groups.push(group("Plugins", ...plugins.map((p) => capRow({ name: p.split("@")[0], what: `Claude Code plugin ${p}`, asks: "Asks unless allowed in config", off: [`plugin:${p}`] }))));
   }
@@ -157,6 +157,22 @@ function button(text: string, cls: string, onClick: () => void) {
   return b;
 }
 
+/** What this sign-in's account can reach; reruns whenever the account changes. */
+let account = "";
+function loadConnectors() {
+  servers = null;
+  renderCaps();
+  invoke<Server[]>("detect_connectors")
+    .then((s) => (servers = s))
+    .catch((e) => (servers = `Couldn't check connectors: ${e}`))
+    .finally(renderCaps);
+}
+
+const WHERE =
+  "Otto has its own sign-in, separate from Claude Code in your Terminal. The token is saved in your Mac's Keychain " +
+  '(as "Claude Code-credentials" plus a short code), is used only for Otto\'s tasks, and only goes to Anthropic. ' +
+  "Signing in or out here doesn't touch your Terminal login.";
+
 /** "Sign in" runs the CLI's own login. The token stays in the Keychain, owned by Claude Code. */
 async function renderAccount(waiting = false, error = "") {
   const box = $("account");
@@ -173,6 +189,16 @@ async function renderAccount(waiting = false, error = "") {
     return;
   }
   const a = await invoke<Account>("claude_account");
+  const who = a.logged_in ? a.email ?? "?" : "";
+  if (who !== account || servers === null) {
+    account = who;
+    if (who) loadConnectors();
+    else {
+      servers = "Sign in to Claude on the previous step to see what your account connects to.";
+      renderCaps();
+    }
+  }
+  const where = el("p", "muted small", WHERE);
   const signIn = (label: string, cls: string) =>
     button(label, cls, () =>
       invoke("claude_login")
@@ -190,10 +216,19 @@ async function renderAccount(waiting = false, error = "") {
       ...err,
     );
   } else if (!a.logged_in) {
-    box.replaceChildren(el("p", "", "Sign in with your Claude account. Otto uses your plan, no API key needed."), signIn("Sign in to Claude", "ghost"), ...err);
+    box.replaceChildren(
+      el("p", "", "Sign in with your Claude account. Otto uses your plan, no API key needed."),
+      signIn("Sign in to Claude", "ghost"),
+      where,
+      ...err,
+    );
   } else {
-    const who = a.email ?? "your Claude account";
-    box.replaceChildren(el("p", "", `Signed in as ${who}.`), signIn("Use a different account", "quiet"), ...err);
+    const signOut = button("Sign out", "quiet", () =>
+      invoke("claude_logout")
+        .then(() => renderAccount())
+        .catch((e) => renderAccount(false, String(e))),
+    );
+    box.replaceChildren(el("p", "", `Signed in as ${a.email ?? "your Claude account"}.`), signIn("Use a different account", "ghost"), signOut, where, ...err);
   }
 }
 
@@ -233,10 +268,6 @@ listen<{ state: string; text: string | null }>("otto://pill", (e) => {
   info.disabled.forEach((d) => disabled.add(d));
   plugins = info.plugins;
   renderCaps();
-  invoke<Server[]>("detect_connectors")
-    .then((s) => (servers = s))
-    .catch((e) => (servers = String(e)))
-    .finally(renderCaps);
   renderAis(await invoke<Detected>("onboarding_detect"));
   renderAccount();
 })();

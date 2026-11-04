@@ -173,20 +173,15 @@ pub async fn detect_connectors() -> Result<Vec<Server>, String> {
     use std::io::BufRead;
     let claude = crate::tasks::claude_bin().ok_or("Claude Code isn't installed")?;
     let config = crate::tasks::config();
-    let plugins: Map<String, Value> = config["plugins"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|p| p.as_str())
-        .map(|p| (p.to_string(), Value::Bool(true)))
-        .collect();
-    let mut child = Command::new(claude)
+    let plugins = crate::tasks::strings(&config["plugins"]);
+    let mut cmd = crate::tasks::claude_cli(&claude);
+    for d in crate::tasks::plugin_dirs(&plugins) {
+        cmd.arg("--plugin-dir").arg(d);
+    }
+    let mut child = cmd
         .args(["-p", "ok", "--output-format", "stream-json", "--verbose", "--restricted", "--tools", "Read"])
-        .arg("--settings")
-        .arg(json!({ "enabledPlugins": plugins }).to_string())
         .current_dir(std::env::temp_dir())
         .env("MCP_CONNECTION_NONBLOCKING", "false")
-        .env_remove("CLAUDE_CODE_PLUGIN_DIRS")
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
@@ -201,7 +196,7 @@ pub async fn detect_connectors() -> Result<Vec<Server>, String> {
         .find(|v| v["subtype"] == "init");
     let _ = child.kill();
     let _ = child.wait();
-    let init = init.ok_or("Claude Code didn't start (is it logged in?)")?;
+    let init = init.ok_or("Claude Code didn't start. Sign in on the previous step.")?;
     let mut servers: Vec<Server> = Vec::new();
     for tool in init["tools"].as_array().into_iter().flatten().filter_map(|t| t.as_str()) {
         let Some(rest) = tool.strip_prefix("mcp__") else { continue };
@@ -293,8 +288,8 @@ mod mac {
     }
 }
 
-/// Who the claude CLI is signed in as. Otto never sees the token: the CLI
-/// keeps it in the macOS Keychain and every task runs through the CLI.
+/// Who Otto's Claude Code profile is signed in as. Otto never reads the token:
+/// the CLI keeps it in the macOS Keychain and every task runs through the CLI.
 #[derive(Serialize, Default)]
 pub struct Account {
     installed: bool,
@@ -303,10 +298,20 @@ pub struct Account {
     method: Option<String>,
 }
 
+impl Account {
+    pub fn logged_in(&self) -> bool {
+        self.logged_in
+    }
+}
+
 #[tauri::command]
 pub async fn claude_account() -> Account {
+    account()
+}
+
+pub fn account() -> Account {
     let Some(bin) = crate::tasks::claude_bin() else { return Account::default() };
-    let out = Command::new(bin).args(["auth", "status"]).env_remove("CLAUDE_CODE_PLUGIN_DIRS").output();
+    let out = crate::tasks::claude_cli(&bin).args(["auth", "status"]).output();
     let v: Value = out.ok().and_then(|o| serde_json::from_slice(&o.stdout).ok()).unwrap_or_default();
     let s = |k: &str| v[k].as_str().map(String::from);
     Account { installed: true, logged_in: v["loggedIn"] == true, email: s("email"), method: s("authMethod") }
@@ -328,9 +333,8 @@ pub fn claude_login(app: AppHandle) -> Result<(), String> {
     if slot.is_some() {
         return Ok(()); // already waiting on the browser
     }
-    let mut child = Command::new(bin)
+    let mut child = crate::tasks::claude_cli(&bin)
         .args(["auth", "login", "--claudeai"])
-        .env_remove("CLAUDE_CODE_PLUGIN_DIRS")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -367,4 +371,12 @@ pub fn claude_login_code(code: String) -> Result<(), String> {
     let mut slot = LOGIN.lock().map_err(|_| "login state poisoned")?;
     let stdin = slot.as_mut().ok_or("Click Sign in first.")?;
     writeln!(stdin, "{code}").map_err(|e| e.to_string())
+}
+
+/// Signs Otto's profile out. The terminal Claude Code login is untouched.
+#[tauri::command]
+pub async fn claude_logout() -> Result<(), String> {
+    let bin = crate::tasks::claude_bin().ok_or("Claude Code isn't installed")?;
+    let out = crate::tasks::claude_cli(&bin).args(["auth", "logout"]).output().map_err(|e| e.to_string())?;
+    if out.status.success() { Ok(()) } else { Err("Couldn't sign out.".into()) }
 }

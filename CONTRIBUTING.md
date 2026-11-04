@@ -4,7 +4,7 @@ Thanks for taking a look. Otto is small and early, so bug reports and focused pu
 
 ## Run it locally
 
-You need macOS on Apple Silicon, [Rust](https://rustup.rs), Node 20+, and [Claude Code](https://docs.claude.com/claude-code) installed and logged in.
+You need macOS on Apple Silicon, [Rust](https://rustup.rs), Node 20+, and [Claude Code](https://docs.claude.com/claude-code) installed. Otto signs in with its own profile in `~/Otto/claude` (setup window, step 3).
 
 ```bash
 git clone https://github.com/sacredvoid/otto.git && cd otto

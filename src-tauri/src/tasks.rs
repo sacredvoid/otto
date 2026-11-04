@@ -338,7 +338,7 @@ fn otto_dir() -> PathBuf {
     dirs::home_dir().unwrap_or_default().join("Otto")
 }
 
-fn strings(v: &Value) -> Vec<String> {
+pub(crate) fn strings(v: &Value) -> Vec<String> {
     v.as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect()).unwrap_or_default()
 }
 
@@ -451,34 +451,29 @@ pub(crate) fn claude_command(claude: &Path, prompt: &str, dir: &Path, gate_url: 
     let mut servers = config["mcp_servers"].as_object().cloned().unwrap_or_default();
     servers.insert("otto".into(), serde_json::json!({ "type": "http", "url": gate_url })); // can't be overridden
     let off = strings(&config["disabled"]);
-    let plugins: serde_json::Map<String, Value> = strings(&config["plugins"])
-        .into_iter()
-        .filter(|p| !off.contains(&format!("plugin:{p}")))
-        .map(|p| (p, Value::Bool(true)))
-        .collect();
+    let plugins: Vec<String> = strings(&config["plugins"]).into_iter().filter(|p| !off.contains(&format!("plugin:{p}"))).collect();
     let tools: Vec<&str> = TOOLS.split(',').filter(|t| !is_disabled(&off, t)).collect();
     // Turned-off tools and servers, denied by Claude Code itself (the gate blocks them too).
     let deny: Vec<&str> = off.iter().map(String::as_str).filter(|d| !d.starts_with("plugin:")).collect();
     let readable = readable_dirs();
-    let mut cmd = Command::new(claude);
+    let mut cmd = claude_cli(claude);
     cmd.arg("-p")
         .arg(prompt)
         .args(["--output-format", "stream-json", "--verbose"])
         .args(["--restricted", "--tools", &tools.join(",")])
         .arg("--mcp-config")
         .arg(serde_json::json!({ "mcpServers": servers }).to_string())
-        .arg("--settings")
-        .arg(serde_json::json!({ "enabledPlugins": plugins }).to_string())
         .args(["--permission-prompt-tool", "mcp__otto__approve"])
         .arg("--append-system-prompt")
         .arg(system_prompt(&readable, dir))
         .current_dir(dir)
         // Wait for connectors before the first turn; by default they attach late and the model never sees them.
         .env("MCP_CONNECTION_NONBLOCKING", "false")
-        // Plugin dirs inherited from a parent agent (e.g. a terminal Otto was launched from) are not the user's choice.
-        .env_remove("CLAUDE_CODE_PLUGIN_DIRS")
         // Approvals can take minutes; don't let Claude Code time out the gate call first.
         .env("MCP_TOOL_TIMEOUT", (gate::APPROVAL_TIMEOUT.as_millis() + 60_000).to_string());
+    for d in plugin_dirs(&plugins) {
+        cmd.arg("--plugin-dir").arg(d);
+    }
     if !deny.is_empty() {
         cmd.arg(format!("--disallowedTools={}", deny.join(",")));
     }
@@ -532,6 +527,45 @@ pub(crate) fn describe_tool(name: &str, input: &Value) -> String {
         }
         other => format!("Using {other}"),
     }
+}
+
+/// Otto's own Claude Code profile: its own sign-in (a separate Keychain entry,
+/// "Claude Code-credentials-<hash of this path>"), sessions and settings, so
+/// the user's terminal Claude Code login is never used or changed by Otto.
+pub(crate) fn claude_home() -> PathBuf {
+    dirs::home_dir().unwrap_or_default().join("Otto/claude")
+}
+
+/// Every claude process Otto starts goes through here.
+pub(crate) fn claude_cli(bin: &Path) -> Command {
+    let home = claude_home();
+    let _ = std::fs::create_dir_all(&home);
+    let mut cmd = Command::new(bin);
+    cmd.env("CLAUDE_CONFIG_DIR", &home)
+        .env_remove("CLAUDE_SECURESTORAGE_CONFIG_DIR")
+        // Plugin dirs inherited from a parent agent (e.g. a terminal Otto was launched from) are not the user's choice.
+        .env_remove("CLAUDE_CODE_PLUGIN_DIRS");
+    cmd
+}
+
+/// Plugins stay installed in the user's own Claude Code (~/.claude/plugins);
+/// Otto's profile loads the ones named in config.json from there.
+pub(crate) fn plugin_dirs(names: &[String]) -> Vec<PathBuf> {
+    let home = dirs::home_dir().unwrap_or_default();
+    let installed: Value = std::fs::read(home.join(".claude/plugins/installed_plugins.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default();
+    names
+        .iter()
+        .filter_map(|n| {
+            let dir = installed["plugins"][n.as_str()][0]["installPath"].as_str().map(PathBuf::from).filter(|d| d.is_dir());
+            if dir.is_none() {
+                eprintln!("[otto] plugin {n} isn't installed in Claude Code, skipping");
+            }
+            dir
+        })
+        .collect()
 }
 
 /// GUI apps don't inherit the shell PATH, so look in the usual places.
