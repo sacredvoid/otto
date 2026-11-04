@@ -86,7 +86,7 @@ fn outcome(dir: &Path) -> (&'static str, String) {
     }
 }
 
-fn entries(root: &Path) -> Vec<Entry> {
+fn entries(root: &Path, active: &std::collections::HashSet<PathBuf>) -> Vec<Entry> {
     let mut out: Vec<Entry> = std::fs::read_dir(root)
         .into_iter()
         .flatten()
@@ -95,7 +95,7 @@ fn entries(root: &Path) -> Vec<Entry> {
         .filter_map(|e| {
             let dir = e.path();
             let (transcript, created_unix) = meta(&dir)?;
-            let (status, text) = outcome(&dir);
+            let (status, text) = if active.contains(&dir) { ("running", String::new()) } else { outcome(&dir) };
             let preview = if status == "done" { tasks::preview(&text) } else { text };
             Some(Entry { folder: e.file_name().to_string_lossy().into_owned(), created_unix, transcript, status, preview })
         })
@@ -238,15 +238,15 @@ fn audit_path() -> PathBuf {
 
 // Async so the disk reads run off the main thread.
 #[tauri::command]
-pub async fn list_history() -> Vec<Entry> {
-    entries(&tasks::tasks_root())
+pub async fn list_history(tasks: tauri::State<'_, tasks::Tasks>) -> Result<Vec<Entry>, String> {
+    Ok(entries(&tasks::tasks_root(), &tasks.active_dirs()))
 }
 
 #[tauri::command]
-pub async fn history_detail(folder: String) -> Result<Detail, String> {
+pub async fn history_detail(tasks: tauri::State<'_, tasks::Tasks>, folder: String) -> Result<Detail, String> {
     let dir = dir_of(&folder)?;
     let (transcript, created_unix) = meta(&dir).ok_or("task.json is missing or unreadable")?;
-    let (status, result) = outcome(&dir);
+    let (status, result) = if tasks.active_dirs().contains(&dir) { ("running", String::new()) } else { outcome(&dir) };
     Ok(Detail {
         transcript,
         created_unix,
@@ -334,7 +334,9 @@ mod tests {
         assert_eq!(outcome(&done), ("done", "All set.".into()));
         assert_eq!(outcome(&failed), ("failed", "Out of credits".into()));
         assert_eq!(outcome(&partial).0, "incomplete");
-        assert_eq!(entries(&root).len(), 3);
+        assert_eq!(entries(&root, &Default::default()).len(), 3);
+        let busy = entries(&root, &[partial.clone()].into_iter().collect());
+        assert!(busy.iter().any(|e| e.status == "running"), "an active folder shows as running");
         let _ = std::fs::remove_dir_all(root);
     }
 }

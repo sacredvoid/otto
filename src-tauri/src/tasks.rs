@@ -153,6 +153,13 @@ impl Tasks {
         }
     }
 
+    /// Folders of tasks that are queued or running right now (History shows them as running).
+    pub fn active_dirs(&self) -> std::collections::HashSet<PathBuf> {
+        let inner = self.inner.lock().unwrap();
+        let running = inner.pids.keys().filter_map(|id| inner.dirs.get(id));
+        running.chain(inner.queue.iter().map(|j| &j.dir)).cloned().collect()
+    }
+
     pub fn dir(&self, id: u64) -> Option<PathBuf> {
         self.inner.lock().unwrap().dirs.get(&id).cloned()
     }

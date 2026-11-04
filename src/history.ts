@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { renderMarkdown, withoutRecap } from "./markdown";
 
-type Status = "done" | "failed" | "incomplete";
+type Status = "done" | "failed" | "incomplete" | "running";
 type Entry = { folder: string; created_unix: number; transcript: string; status: Status; preview: string };
 type Approval = { decision: string; by: string } | null;
 type Item =
@@ -20,7 +20,18 @@ type Detail = {
   files: string[];
 };
 
-const STATUS_LABEL: Record<Status, string> = { done: "Done", failed: "Failed", incomplete: "Didn't finish" };
+const STATUS_LABEL: Record<Status, string> = { done: "Done", failed: "Failed", incomplete: "Stopped", running: "Running" };
+// One glyph per status so it reads without relying on color alone.
+const STATUS_ICON: Record<Status, string> = { done: "\u2713", failed: "\u2715", incomplete: "\u25A0", running: "" };
+
+function statusBadge(s: Status, big = false) {
+  const b = el("span", `status ${s}${big ? " big" : ""}`);
+  b.append(el("span", "icon", STATUS_ICON[s]));
+  if (big) b.append(STATUS_LABEL[s]);
+  else b.setAttribute("aria-label", STATUS_LABEL[s]);
+  b.title = STATUS_LABEL[s];
+  return b;
+}
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const list = $<HTMLUListElement>("list");
@@ -58,12 +69,11 @@ function renderList() {
       li.setAttribute("role", "option");
       li.setAttribute("aria-selected", String(e.folder === selected));
       li.dataset.folder = e.folder;
-      const dot = el("span", `dot ${e.status}`);
-      dot.title = STATUS_LABEL[e.status];
+      const dot = statusBadge(e.status);
       dot.setAttribute("role", "img");
-      dot.setAttribute("aria-label", STATUS_LABEL[e.status]);
       const text = el("div", "text");
-      text.append(el("span", "title", firstLine(e.transcript)), el("span", "when", relative(e.created_unix)));
+      const when = el("span", `when ${e.status}`, e.status === "done" ? relative(e.created_unix) : `${STATUS_LABEL[e.status]} \u00b7 ${relative(e.created_unix)}`);
+      text.append(el("span", "title", firstLine(e.transcript)), when);
       li.append(dot, text);
       li.addEventListener("click", () => select(e.folder));
       return li;
@@ -151,12 +161,13 @@ function renderItem(it: Item, start: number): HTMLLIElement {
 function renderDetail(folder: string, d: Detail) {
   $("empty").hidden = true;
   $("task").hidden = false;
-  $("meta").textContent = `${new Date(d.created_unix * 1000).toLocaleString()} · ${STATUS_LABEL[d.status]}`;
+  $("meta").replaceChildren(statusBadge(d.status, true), el("span", "", new Date(d.created_unix * 1000).toLocaleString()));
 
   const firstTs = d.trace.find((i) => i.kind === "tool" || i.kind === "note") as { ts: string } | undefined;
   const start = firstTs ? Date.parse(firstTs.ts) : 0;
   const items = d.trace.map((it) => renderItem(it, start));
   if (d.status === "incomplete") items.push(node("stopped", el("p", "body muted", "Stopped here (cancelled, or Otto quit).")));
+  if (d.status === "running") items.push(node("live", el("p", "body muted", "Still working\u2026")));
   $("trace").replaceChildren(...items);
 
   $("files-box").hidden = !d.files.length;
@@ -205,6 +216,6 @@ list.addEventListener("keydown", onKey);
 
 getCurrentWindow().onFocusChanged(({ payload: focused }) => focused && refresh());
 listen<{ status: string }>("otto://task", ({ payload }) => {
-  if (payload.status === "done" || payload.status === "failed") refresh();
+  if (payload.status !== "queued") refresh(); // running, done or failed changes a badge
 });
 refresh();

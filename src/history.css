@@ -129,21 +129,55 @@ aside {
   font-size: 12px;
   color: var(--muted);
 }
-.dot {
+/* Status: icon + color + (in the detail) a word, so it reads at a glance and without color. */
+.status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  margin-top: 5px;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.status .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
+  font-size: 11px;
+  line-height: 1;
+  color: #fff;
 }
-.dot.done {
-  background: var(--teal);
+.item > .status {
+  margin-top: 1px;
 }
-.dot.failed {
-  background: var(--rose);
+.status.done .icon { background: var(--teal); }
+.status.failed .icon { background: #c4564b; }
+.status.incomplete .icon { background: #fff; color: #8a9893; border: 1.5px solid #c4d0cb; font-size: 8px; box-sizing: border-box; }
+.status.running .icon {
+  box-sizing: border-box;
+  border: 2px solid var(--mint-2);
+  border-top-color: var(--teal);
+  animation: spin 0.9s linear infinite;
 }
-.dot.incomplete {
-  background: #c4d0cb;
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .status.running .icon { animation: none; } }
+.status.big {
+  padding: 3px 10px 3px 4px;
+  border-radius: 999px;
+}
+.status.big.done { background: var(--mint); color: var(--teal-ink); }
+.status.big.failed { background: #f6e3e1; color: var(--rose-ink); }
+.status.big.incomplete { background: var(--soft); color: var(--muted); }
+.status.big.running { background: #e8f0f7; color: #2b5677; }
+.when.failed { color: var(--rose-ink); }
+.when.running { color: #2b5677; }
+#meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 /* Right: detail */
