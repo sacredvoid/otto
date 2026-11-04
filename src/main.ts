@@ -1,7 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 
 type PillState = "idle" | "listening" | "transcribing" | "heard" | "miss";
-type Pill = { state: PillState; text: string | null; ms: number | null };
+type Pill = { state: PillState; text: string | null; ms: number | null; follow_up: boolean };
 
 const pill = document.getElementById("pill")!;
 const label = document.getElementById("label")!;
@@ -27,7 +27,7 @@ function clip(s: string, n = 52) {
 
 listen<Pill>("otto://pill", ({ payload }) => {
   pill.dataset.state = payload.state;
-  label.textContent = LABELS[payload.state];
+  label.textContent = payload.follow_up ? "Following up" : LABELS[payload.state];
   if (payload.state === "heard" && payload.text) {
     detail.textContent = `"${clip(payload.text)}"`;
     detail.title = payload.ms ? `${payload.ms} ms` : "";

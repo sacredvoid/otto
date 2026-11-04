@@ -167,6 +167,7 @@ main {
   color: var(--ink-2);
 }
 blockquote {
+  white-space: pre-line;
   margin: 0;
   font-size: 20px;
   font-weight: 500;

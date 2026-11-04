@@ -70,7 +70,15 @@ fn dir_of(folder: &str) -> Result<PathBuf, String> {
 
 fn meta(dir: &Path) -> Option<(String, u64)> {
     let v: Value = serde_json::from_slice(&std::fs::read(dir.join("task.json")).ok()?).ok()?;
-    Some((v["transcript"].as_str()?.to_string(), v["created_unix"].as_u64().unwrap_or(0)))
+    // Follow-ups show under the original request, one per line.
+    let mut said = v["transcript"].as_str()?.to_string();
+    for f in v["followups"].as_array().into_iter().flatten() {
+        if let Some(t) = f["transcript"].as_str() {
+            said.push_str("\n\u{21b3} ");
+            said.push_str(t);
+        }
+    }
+    Some((said, v["created_unix"].as_u64().unwrap_or(0)))
 }
 
 /// Status plus the result text: result.md on success, else the log's error.

@@ -42,6 +42,41 @@ struct Job {
     title: String,
     prompt: String,
     dir: PathBuf,
+    /// Claude session to continue, for a follow-up.
+    resume: Option<String>,
+}
+
+/// The most recently finished task, which a follow-up continues.
+#[derive(Clone)]
+struct Finished {
+    dir: PathBuf,
+    title: String,
+    session: String,
+    at: std::time::Instant,
+}
+
+const FOLLOW_UP_WINDOW: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+
+/// Openers that refer back to the last task ("no, make it shorter", "try again").
+// ponytail: a phrase list, so "also book a flight" joins the last task. Cheap to be wrong:
+// Claude still does it, just in the previous folder. Swap for a model call if it misfires often.
+const FOLLOW_UP_OPENERS: [&str; 24] = [
+    "no", "nope", "actually", "also", "and", "instead", "but", "wait", "make it", "make that",
+    "change it", "change that", "do that", "do the same", "same for", "same thing", "try again",
+    "redo", "again", "send it", "send that", "shorter", "longer", "undo",
+];
+
+pub(crate) fn is_follow_up(text: &str) -> bool {
+    let t = text.trim_start_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+    FOLLOW_UP_OPENERS.iter().any(|o| {
+        t.strip_prefix(o).is_some_and(|rest| rest.chars().next().is_none_or(|c| !c.is_alphanumeric()))
+    })
+}
+
+/// What `submit` queued, for the pill.
+pub struct Submitted {
+    pub title: String,
+    pub follow_up: bool,
 }
 
 #[derive(Default)]
@@ -58,6 +93,7 @@ struct Inner {
     /// Process ids of running tasks, for Cancel.
     pids: HashMap<u64, u32>,
     cancelled: std::collections::HashSet<u64>,
+    last_finished: Option<Finished>,
 }
 
 fn emit(app: &AppHandle, id: u64, title: &str, status: &'static str, step: Option<String>, summary: Option<String>) {
@@ -65,25 +101,39 @@ fn emit(app: &AppHandle, id: u64, title: &str, status: &'static str, step: Optio
 }
 
 impl Tasks {
-    /// Queues a spoken request and returns its short title.
-    pub fn submit(app: &AppHandle, transcript: &str) -> Result<String, String> {
-        let title = title_of(transcript);
-        let dir = new_task_dir(&tasks_root(), transcript)?;
-        let meta = serde_json::json!({ "transcript": transcript, "created_unix": unix_now() });
-        std::fs::write(dir.join("task.json"), serde_json::to_vec_pretty(&meta).unwrap())
-            .map_err(|e| format!("could not write task file: {e}"))?;
-
+    /// Queues a spoken request: a follow-up to the task that just finished, or a new task.
+    pub fn submit(app: &AppHandle, transcript: &str) -> Result<Submitted, String> {
         let tasks = app.state::<Tasks>();
+        let follow = {
+            let mut inner = tasks.inner.lock().unwrap();
+            let recent = inner.last_finished.as_ref().is_some_and(|f| f.at.elapsed() < FOLLOW_UP_WINDOW);
+            if recent && is_follow_up(transcript) { inner.last_finished.take() } else { None }
+        };
+        let (title, dir, resume) = match follow {
+            Some(f) => {
+                add_follow_up(&f.dir, transcript)?;
+                (f.title, f.dir, Some(f.session))
+            }
+            None => {
+                let dir = new_task_dir(&tasks_root(), transcript)?;
+                let meta = serde_json::json!({ "transcript": transcript, "created_unix": unix_now() });
+                std::fs::write(dir.join("task.json"), serde_json::to_vec_pretty(&meta).unwrap())
+                    .map_err(|e| format!("could not write task file: {e}"))?;
+                (title_of(transcript), dir, None)
+            }
+        };
+        let follow_up = resume.is_some();
+
         let mut inner = tasks.inner.lock().unwrap();
         inner.next_id += 1;
         let id = inner.next_id;
         inner.dirs.insert(id, dir.clone());
-        inner.queue.push_back(Job { id, title: title.clone(), prompt: transcript.to_string(), dir });
+        inner.queue.push_back(Job { id, title: title.clone(), prompt: transcript.to_string(), dir, resume });
         drop(inner);
 
         emit(app, id, &title, "queued", None, None);
         start_ready(app);
-        Ok(title)
+        Ok(Submitted { title, follow_up })
     }
 
     /// Stops a running task, or drops it from the queue.
@@ -166,7 +216,13 @@ fn run(app: &AppHandle, job: &Job) {
     };
     let gate = app.state::<Arc<Gate>>().inner().clone();
     gate.register(job.id, &job.dir, &job.title, readable_dirs(), allow_tools());
-    let child = claude_command(&claude, &job.prompt, &job.dir, &gate.url(job.id))
+    let mut cmd = claude_command(&claude, &job.prompt, &job.dir, &gate.url(job.id));
+    if let Some(session) = &job.resume {
+        // The resumed conversation may already hold private data, so start tainted.
+        gate.taint(job.id);
+        cmd.arg("--resume").arg(session);
+    }
+    let child = cmd
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -187,13 +243,18 @@ fn run(app: &AppHandle, job: &Job) {
         s
     });
 
-    let mut log = std::fs::File::create(job.dir.join("log.jsonl")).ok();
+    // Follow-ups append, so the log (and History's steps) cover the whole thread.
+    let mut log = std::fs::OpenOptions::new().create(true).append(true).open(job.dir.join("log.jsonl")).ok();
     let mut outcome: Option<(bool, String)> = None;
+    let mut session: Option<String> = None;
     for line in BufReader::new(child.stdout.take().unwrap()).lines().map_while(Result::ok) {
         if let Some(f) = log.as_mut() {
             let _ = writeln!(f, "{line}");
         }
         let Ok(ev) = serde_json::from_str::<Value>(&line) else { continue };
+        if session.is_none() {
+            session = ev["session_id"].as_str().map(String::from);
+        }
         match ev["type"].as_str() {
             Some("assistant") => {
                 for c in ev["message"]["content"].as_array().into_iter().flatten() {
@@ -221,6 +282,10 @@ fn run(app: &AppHandle, job: &Job) {
         inner.pids.remove(&job.id);
         inner.cancelled.remove(&job.id)
     };
+    if let Some(session) = session.filter(|_| !cancelled) {
+        let f = Finished { dir: job.dir.clone(), title: job.title.clone(), session, at: std::time::Instant::now() };
+        app.state::<Tasks>().inner.lock().unwrap().last_finished = Some(f);
+    }
     if cancelled {
         println!("[otto] task {} cancelled", job.id);
         return emit(app, job.id, &job.title, "failed", None, Some("Cancelled.".into()));
@@ -450,6 +515,21 @@ pub fn tasks_root() -> PathBuf {
     dirs::home_dir().unwrap_or_default().join("Otto/tasks")
 }
 
+/// Records a follow-up in task.json ("followups": [{ transcript, created_unix }]).
+fn add_follow_up(dir: &Path, transcript: &str) -> Result<(), String> {
+    let path = dir.join("task.json");
+    let mut meta: Value = std::fs::read(&path).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+    if !meta.is_object() {
+        return Err("task.json is unreadable".into());
+    }
+    let entry = serde_json::json!({ "transcript": transcript, "created_unix": unix_now() });
+    match meta["followups"].as_array_mut() {
+        Some(list) => list.push(entry),
+        None => meta["followups"] = serde_json::json!([entry]),
+    }
+    std::fs::write(&path, serde_json::to_vec_pretty(&meta).unwrap()).map_err(|e| format!("could not write task file: {e}"))
+}
+
 fn new_task_dir(root: &Path, transcript: &str) -> Result<PathBuf, String> {
     std::fs::create_dir_all(root).map_err(|e| format!("could not create {}: {e}", root.display()))?;
     let base = format!("{}-{}", utc_date(unix_now()), slug(transcript));
@@ -512,6 +592,11 @@ mod tests {
         assert_eq!(utc_date(1_793_750_400), "2026-11-04");
         assert_eq!(slug("Make a 5-slide deck on Q3 hiring, please!"), "make-a-5-slide-deck-on");
         assert_eq!(slug("?!"), "task");
+        assert!(is_follow_up("No, make it shorter."));
+        assert!(is_follow_up("make it formal"));
+        assert!(is_follow_up("...try again"));
+        assert!(!is_follow_up("Notes for tomorrow"), "prefix of a longer word");
+        assert!(!is_follow_up("Add milk to my reminders"));
         assert_eq!(title_of("Summarize the lease."), "Summarize the lease");
         assert_eq!(preview("Long body.\n\n```\ncode\n```\n\nDone: ran `git status`, **no** repo."), "Done: ran git status, no repo.");
     }

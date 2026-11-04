@@ -120,6 +120,12 @@ impl Gate {
         self.tasks.lock().unwrap().insert(task_id, ctx);
     }
 
+    pub fn taint(&self, task_id: u64) {
+        if let Some(c) = self.tasks.lock().unwrap().get_mut(&task_id) {
+            c.tainted = true;
+        }
+    }
+
     pub fn unregister(&self, task_id: u64) {
         self.tasks.lock().unwrap().remove(&task_id);
     }

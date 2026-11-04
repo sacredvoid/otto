@@ -33,10 +33,11 @@ struct Pill {
     state: &'static str,
     text: Option<String>,
     ms: Option<u128>,
+    follow_up: bool,
 }
 
 fn pill(app: &AppHandle, state: &'static str, text: Option<String>, ms: Option<u128>) {
-    let _ = app.emit("otto://pill", Pill { state, text, ms });
+    let _ = app.emit("otto://pill", Pill { state, text, ms, follow_up: false });
 }
 
 fn on_press(app: &AppHandle) {
@@ -100,7 +101,9 @@ fn on_release(app: &AppHandle) {
                     return;
                 }
                 match tasks::Tasks::submit(&app, &text) {
-                    Ok(title) => pill(&app, "heard", Some(title), Some(ms)),
+                    Ok(s) => {
+                        let _ = app.emit("otto://pill", Pill { state: "heard", text: Some(s.title), ms: Some(ms), follow_up: s.follow_up });
+                    }
                     Err(e) => {
                         eprintln!("[otto] could not queue task: {e}");
                         pill(&app, "miss", Some(e), None);
