@@ -485,6 +485,17 @@ pub(crate) fn describe_tool(name: &str, input: &Value) -> String {
         "WebSearch" => "Searching the web".into(),
         "WebFetch" => "Reading a web page".into(),
         "TodoWrite" => "Planning".into(),
+        "Bash" if input["command"].as_str().is_some_and(|c| c.contains("osascript")) => "Controlling a Mac app".into(),
+        "Bash" => "Running a command".into(),
+        "mcp__otto__find_files" => "Searching with Spotlight".into(),
+        "mcp__otto__remember" => "Saving to memory".into(),
+        t if t.starts_with("mcp__") => {
+            // "mcp__claude_ai_Gmail__search_threads" -> "Gmail: search threads"
+            let mut parts = t.splitn(3, "__").skip(1);
+            let (server, name) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
+            let server = server.strip_prefix("claude_ai_").or(server.strip_prefix("plugin_")).unwrap_or(server);
+            format!("{}: {}", server.replace('_', " "), name.replace('_', " "))
+        }
         other => format!("Using {other}"),
     }
 }

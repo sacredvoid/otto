@@ -36,20 +36,14 @@
         <p class="muted small">Hold Ctrl+Option+Space and say what you need. It will show up here.</p>
       </div>
       <article id="task" hidden>
-        <blockquote id="transcript"></blockquote>
-        <p id="meta" class="muted small"></p>
-        <div id="result" class="result" tabindex="0" aria-label="Result"></div>
-        <details id="steps-box">
-          <summary>Steps</summary>
-          <ol id="steps"></ol>
-        </details>
-        <details id="approvals-box">
-          <summary>Approvals</summary>
-          <ul id="approvals"></ul>
-        </details>
-        <div class="files">
-          <div id="files" class="chips"></div>
+        <header class="task-head">
+          <p id="meta" class="muted small"></p>
           <button id="finder" type="button" class="ghost">Show in Finder</button>
+        </header>
+        <ol id="trace" class="trace" aria-label="What happened, in order"></ol>
+        <div id="files-box" class="files">
+          <span class="muted small">Files</span>
+          <div id="files" class="chips"></div>
         </div>
       </article>
     </main>

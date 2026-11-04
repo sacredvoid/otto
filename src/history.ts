@@ -5,15 +5,18 @@ import { renderMarkdown } from "./markdown";
 
 type Status = "done" | "failed" | "incomplete";
 type Entry = { folder: string; created_unix: number; transcript: string; status: Status; preview: string };
-type Step = { label: string; tool: string };
-type Approval = { ts: number; tool: string; decision: string; by: string; input: string };
+type Approval = { decision: string; by: string } | null;
+type Item =
+  | { kind: "said"; text: string; unix: number; follow_up: boolean }
+  | { kind: "note"; text: string; ts: string }
+  | { kind: "tool"; tool: string; label: string; detail: string; approval: Approval; output: string | null; error: boolean; ts: string }
+  | { kind: "result"; ok: boolean; text: string; duration_ms: number | null };
 type Detail = {
   transcript: string;
   created_unix: number;
   status: Status;
   result: string;
-  steps: Step[];
-  approvals: Approval[];
+  trace: Item[];
   files: string[];
 };
 
@@ -83,55 +86,80 @@ async function select(folder: string) {
   } catch (e) {
     if (selected !== folder) return;
     $("task").hidden = false;
-    $("transcript").textContent = "";
     $("meta").textContent = "";
-    $("result").replaceChildren(el("p", "error", `Couldn't load this task: ${e}`));
+    $("trace").replaceChildren(el("p", "error", `Couldn't load this task: ${e}`));
     return;
   }
   if (selected !== folder) return; // a newer click won
   renderDetail(folder, d);
 }
 
+function approvalBadge(a: Approval) {
+  if (!a) return null;
+  const [cls, text] =
+    a.decision === "allow" ? (a.by === "user" ? ["ok", "You allowed"] : ["auto", "Auto-allowed"])
+    : a.decision === "block" ? ["no", "Blocked"]
+    : a.by === "timeout" ? ["no", "No answer"]
+    : ["no", "You declined"];
+  return el("span", `badge ${cls}`, text);
+}
+
+function seconds(ms: number) {
+  return ms < 60_000 ? `${Math.round(ms / 1000)}s` : `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
+}
+
+function node(kind: string, ...children: (Node | null)[]) {
+  const li = el("li", `step ${kind}`);
+  li.append(el("span", "marker"), ...children.filter((c): c is Node => c !== null));
+  return li;
+}
+
+function renderItem(it: Item, start: number): HTMLLIElement {
+  if (it.kind === "said") {
+    const body = el("div", "body");
+    body.append(el("div", "kicker", it.follow_up ? "You followed up" : "You said"), el("blockquote", "", it.text.trim()));
+    return node("said", body);
+  }
+  if (it.kind === "note") {
+    return node("note", el("p", "body", it.text));
+  }
+  if (it.kind === "tool") {
+    const body = el("div", "body");
+    const head = el("div", "head");
+    head.append(el("span", "label", it.label), approvalBadge(it.approval) ?? el("span"));
+    const at = Date.parse(it.ts);
+    if (start && at) head.append(el("span", "at", `+${seconds(at - start)}`));
+    body.append(head);
+    if (it.detail) body.append(el("code", "detail", it.detail));
+    if (it.output) {
+      const out = el("details", "output");
+      out.append(el("summary", "", it.error ? "Error" : "Output"), el("pre", "", it.output));
+      body.append(out);
+    }
+    return node(`tool${it.error ? " failed" : ""}`, body);
+  }
+  const body = el("div", "body");
+  const head = el("div", "kicker", it.ok ? "Result" : "Failed");
+  if (it.duration_ms) head.append(el("span", "at", ` · took ${seconds(it.duration_ms)}`));
+  const text = el("div", "result");
+  text.tabIndex = 0;
+  text.append(it.ok ? (it.text ? renderMarkdown(it.text) : el("p", "muted", "No summary.")) : el("p", "error", it.text));
+  body.append(head, text);
+  return node(`outcome${it.ok ? "" : " failed"}`, body);
+}
+
 function renderDetail(folder: string, d: Detail) {
   $("empty").hidden = true;
   $("task").hidden = false;
-  $("transcript").textContent = `“${d.transcript.trim()}”`;
   $("meta").textContent = `${new Date(d.created_unix * 1000).toLocaleString()} · ${STATUS_LABEL[d.status]}`;
 
-  const result = $("result");
-  result.dataset.status = d.status;
-  if (d.status === "done") result.replaceChildren(d.result.trim() ? renderMarkdown(d.result) : el("p", "muted", "No summary."));
-  else if (d.status === "failed") result.replaceChildren(el("p", "error", d.result));
-  else result.replaceChildren(el("p", "muted", "This task stopped before it finished (cancelled, or Otto quit)."));
+  const firstTs = d.trace.find((i) => i.kind === "tool" || i.kind === "note") as { ts: string } | undefined;
+  const start = firstTs ? Date.parse(firstTs.ts) : 0;
+  const items = d.trace.map((it) => renderItem(it, start));
+  if (d.status === "incomplete") items.push(node("stopped", el("p", "body muted", "Stopped here (cancelled, or Otto quit).")));
+  $("trace").replaceChildren(...items);
 
-  $("steps-box").hidden = !d.steps.length;
-  $("steps-box").querySelector("summary")!.textContent = `Steps (${d.steps.length})`;
-  $("steps").replaceChildren(
-    ...d.steps.map((s) => {
-      const li = el("li", "", s.label);
-      if (!s.label.includes(s.tool)) li.append(el("span", "tool", s.tool));
-      return li;
-    }),
-  );
-
-  $("approvals-box").hidden = !d.approvals.length;
-  $("approvals-box").querySelector("summary")!.textContent = `Approvals (${d.approvals.length})`;
-  $("approvals").replaceChildren(
-    ...d.approvals.map((a) => {
-      const li = el("li");
-      const head = el("div", "ahead");
-      const allowed = a.decision === "allow";
-      head.append(
-        el("span", `badge ${allowed ? "ok" : "no"}`, allowed ? "Allowed" : "Denied"),
-        el("span", "tool", a.tool),
-        el("span", "muted small", `${a.by === "user" ? "by you" : `by ${a.by}`} · ${new Date(a.ts * 1000).toLocaleTimeString()}`),
-      );
-      li.append(head);
-      if (a.input) li.append(el("pre", "input", a.input));
-      return li;
-    }),
-  );
-
+  $("files-box").hidden = !d.files.length;
   $("files").replaceChildren(
     ...d.files.map((name) => {
       const b = el("button", "chip", name);

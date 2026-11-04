@@ -29,28 +29,13 @@ pub struct Entry {
 }
 
 #[derive(Serialize)]
-pub struct Step {
-    label: String,
-    tool: String,
-}
-
-#[derive(Serialize)]
-pub struct Approval {
-    ts: u64,
-    tool: String,
-    decision: String,
-    by: String,
-    input: String,
-}
-
-#[derive(Serialize)]
 pub struct Detail {
     transcript: String,
     created_unix: u64,
     status: &'static str,
     result: String,
-    steps: Vec<Step>,
-    approvals: Vec<Approval>,
+    /// The thread in order: what you said, each step and its output, notes, results.
+    trace: Vec<Value>,
     files: Vec<String>,
 }
 
@@ -119,41 +104,132 @@ fn entries(root: &Path) -> Vec<Entry> {
     out
 }
 
-fn steps(dir: &Path) -> Vec<Step> {
-    let log = std::fs::read_to_string(dir.join("log.jsonl")).unwrap_or_default();
-    log.lines()
+const OUTPUT_MAX: usize = 2_000;
+
+fn clip(s: &str, max: usize) -> String {
+    if s.chars().count() > max { s.chars().take(max).collect::<String>() + "\u{2026}" } else { s.to_string() }
+}
+
+/// The one input field worth showing for a step (the command, path, query...).
+fn key_input(input: &Value) -> String {
+    for k in ["command", "file_path", "path", "pattern", "query", "url", "fact", "prompt"] {
+        if let Some(v) = input[k].as_str() {
+            return clip(v, INPUT_MAX);
+        }
+    }
+    if input.as_object().is_some_and(|o| o.is_empty()) { String::new() } else { clip(&input.to_string(), INPUT_MAX) }
+}
+
+struct Decision {
+    tool: String,
+    input: String,
+    decision: String,
+    by: String,
+    used: bool,
+}
+
+/// Gate decisions for this task. Lines from before the folder tag are matched by tool + input.
+fn decisions(audit: &Path, folder: &str) -> Vec<Decision> {
+    std::fs::read_to_string(audit)
+        .unwrap_or_default()
+        .lines()
         .filter_map(|l| serde_json::from_str::<Value>(l).ok())
-        .filter(|v| v["type"] == "assistant")
-        .flat_map(|v| v["message"]["content"].as_array().cloned().unwrap_or_default())
-        .filter(|c| c["type"] == "tool_use")
-        .map(|c| {
-            let tool = c["name"].as_str().unwrap_or("tool").to_string();
-            Step { label: tasks::describe_tool(&tool, &c["input"]), tool }
+        .filter(|v| v["folder"].is_null() || v["folder"].as_str() == Some(folder))
+        .map(|v| {
+            let s = |k: &str| v[k].as_str().unwrap_or_default().to_string();
+            Decision { tool: s("tool"), input: s("input"), decision: s("decision"), by: s("by"), used: false }
         })
         .collect()
 }
 
-/// Audit lines tagged with this task's folder. Older lines have no folder and are skipped.
-fn approvals(audit: &Path, folder: &str) -> Vec<Approval> {
-    let text = std::fs::read_to_string(audit).unwrap_or_default();
-    text.lines()
-        .filter_map(|l| serde_json::from_str::<Value>(l).ok())
-        .filter(|v| v["folder"].as_str() == Some(folder))
-        .map(|v| {
-            let s = |k: &str| v[k].as_str().unwrap_or_default().to_string();
-            let input = match &v["input"] {
-                Value::String(s) => s.clone(),
-                Value::Null => String::new(),
-                other => other.to_string(),
-            };
-            let input = if input.chars().count() > INPUT_MAX {
-                input.chars().take(INPUT_MAX).collect::<String>() + "\u{2026}"
-            } else {
-                input
-            };
-            Approval { ts: v["ts"].as_u64().unwrap_or(0), tool: s("tool"), decision: s("decision"), by: s("by"), input }
-        })
-        .collect()
+/// The gate logs `input.to_string()` (sorted keys, cut at 4000 chars), so the same serialization matches.
+fn take_decision(ds: &mut [Decision], tool: &str, input: &Value) -> Option<Value> {
+    let want = input.to_string();
+    let d = ds.iter_mut().find(|d| {
+        !d.used && d.tool == tool && (d.input == want || d.input.strip_suffix('\u{2026}').is_some_and(|p| want.starts_with(p)))
+    })?;
+    d.used = true;
+    Some(serde_json::json!({ "decision": d.decision, "by": d.by }))
+}
+
+fn tool_output(c: &Value) -> String {
+    let text = match &c["content"] {
+        Value::String(s) => s.clone(),
+        Value::Array(parts) => parts.iter().filter_map(|p| p["text"].as_str()).collect::<Vec<_>>().join("\n"),
+        _ => String::new(),
+    };
+    clip(text.trim(), OUTPUT_MAX)
+}
+
+/// Replays log.jsonl (one Claude run per request, follow-ups appended) into a trace.
+fn trace(dir: &Path, audit: &Path, folder: &str) -> Vec<Value> {
+    use serde_json::json;
+    let meta: Value = std::fs::read(dir.join("task.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+    let mut said = vec![(meta["transcript"].as_str().unwrap_or("").to_string(), meta["created_unix"].as_u64().unwrap_or(0))];
+    for f in meta["followups"].as_array().into_iter().flatten() {
+        said.push((f["transcript"].as_str().unwrap_or("").to_string(), f["created_unix"].as_u64().unwrap_or(0)));
+    }
+    let mut ds = decisions(audit, folder);
+    let mut items: Vec<Value> = Vec::new();
+    let mut by_id: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut runs = 0;
+    let log = std::fs::read_to_string(dir.join("log.jsonl")).unwrap_or_default();
+    for ev in log.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()) {
+        let ts = ev["timestamp"].as_str().unwrap_or("");
+        match (ev["type"].as_str(), ev["subtype"].as_str()) {
+            (Some("system"), Some("init")) => {
+                if let Some((text, at)) = said.get(runs) {
+                    items.push(json!({ "kind": "said", "text": text, "unix": at, "follow_up": runs > 0 }));
+                }
+                runs += 1;
+            }
+            (Some("assistant"), _) => {
+                for c in ev["message"]["content"].as_array().into_iter().flatten() {
+                    match c["type"].as_str() {
+                        Some("text") if !c["text"].as_str().unwrap_or("").trim().is_empty() => {
+                            items.push(json!({ "kind": "note", "text": c["text"].as_str().unwrap_or("").trim(), "ts": ts }));
+                        }
+                        Some("tool_use") => {
+                            let tool = c["name"].as_str().unwrap_or("tool");
+                            let input = &c["input"];
+                            by_id.insert(c["id"].as_str().unwrap_or("").to_string(), items.len());
+                            items.push(json!({
+                                "kind": "tool", "tool": tool, "label": tasks::describe_tool(tool, input),
+                                "detail": key_input(input), "approval": take_decision(&mut ds, tool, input),
+                                "output": Value::Null, "error": false, "ts": ts,
+                            }));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            (Some("user"), _) => {
+                for c in ev["message"]["content"].as_array().into_iter().flatten().filter(|c| c["type"] == "tool_result") {
+                    if let Some(&i) = c["tool_use_id"].as_str().and_then(|id| by_id.get(id)) {
+                        items[i]["output"] = tool_output(c).into();
+                        items[i]["error"] = (c["is_error"] == true).into();
+                    }
+                }
+            }
+            (Some("result"), _) => {
+                let text = ev["result"].as_str().unwrap_or("").trim().to_string();
+                // The closing message is the result itself; don't show it twice.
+                if items.last().is_some_and(|l| l["kind"] == "note" && l["text"].as_str() == Some(text.as_str())) {
+                    items.pop();
+                }
+                let ok = ev["subtype"] == "success" && ev["is_error"] != true;
+                items.push(json!({ "kind": "result", "ok": ok, "text": text, "duration_ms": ev["duration_ms"] }));
+            }
+            _ => {}
+        }
+    }
+    if runs == 0 {
+        // Never started (or no log): still show what was said.
+        for (i, (text, at)) in said.iter().enumerate() {
+            items.push(json!({ "kind": "said", "text": text, "unix": at, "follow_up": i > 0 }));
+        }
+    }
+    items
 }
 
 fn audit_path() -> PathBuf {
@@ -176,8 +252,7 @@ pub async fn history_detail(folder: String) -> Result<Detail, String> {
         created_unix,
         status,
         result,
-        steps: steps(&dir),
-        approvals: approvals(&audit_path(), &folder),
+        trace: trace(&dir, &audit_path(), &folder),
         files: tasks::details(&dir).files,
     })
 }
@@ -196,6 +271,31 @@ pub fn show_history_folder(folder: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn trace_replays_the_thread_in_order() {
+        let d = std::env::temp_dir().join(format!("otto-trace-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("task.json"), r#"{"transcript":"run ls","created_unix":1,"followups":[{"transcript":"no, ls -a","created_unix":2}]}"#).unwrap();
+        let log = [
+            r#"{"type":"system","subtype":"init"}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"Listing."},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}}]}}"#,
+            r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"a.txt"}]}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"Done: a.txt"}]}}"#,
+            r#"{"type":"result","subtype":"success","result":"Done: a.txt"}"#,
+            r#"{"type":"system","subtype":"init"}"#,
+            r#"{"type":"result","subtype":"success","result":"Hidden files too."}"#,
+        ];
+        std::fs::write(d.join("log.jsonl"), log.join("\n")).unwrap();
+        std::fs::write(d.join("audit.jsonl"), r#"{"tool":"Bash","input":"{\"command\":\"ls\"}","decision":"allow","by":"user"}"#).unwrap();
+        let t = trace(&d, &d.join("audit.jsonl"), "x");
+        let kinds: Vec<&str> = t.iter().map(|i| i["kind"].as_str().unwrap()).collect();
+        assert_eq!(kinds, ["said", "note", "tool", "result", "said", "result"], "closing note folded into result");
+        assert_eq!(t[2]["output"], "a.txt");
+        assert_eq!(t[2]["approval"]["by"], "user");
+        assert_eq!(t[4]["follow_up"], true);
+        let _ = std::fs::remove_dir_all(d);
+    }
 
     #[test]
     fn folder_must_be_a_direct_child() {
@@ -234,8 +334,8 @@ mod tests {
         assert_eq!(outcome(&done), ("done", "All set.".into()));
         assert_eq!(outcome(&failed), ("failed", "Out of credits".into()));
         assert_eq!(outcome(&partial).0, "incomplete");
-        assert_eq!(steps(&failed)[0].label, "Writing a.md");
         assert_eq!(entries(&root).len(), 3);
         let _ = std::fs::remove_dir_all(root);
     }
 }
+

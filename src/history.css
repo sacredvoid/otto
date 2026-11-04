@@ -166,17 +166,162 @@ main {
   font-size: 16px;
   color: var(--ink-2);
 }
-blockquote {
-  white-space: pre-line;
+/* ---- trace: one vertical line, one marker per event ---- */
+.task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.task-head p {
   margin: 0;
-  font-size: 20px;
+}
+.trace {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.step {
+  position: relative;
+  padding: 0 0 18px 30px;
+}
+.step::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 18px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--line);
+}
+.step:last-child::before {
+  display: none;
+}
+.marker {
+  position: absolute;
+  left: 2px;
+  top: 3px;
+  width: 14px;
+  height: 14px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid #c9d6d0;
+  background: #fff;
+}
+.said .marker {
+  border-color: var(--teal);
+  background: var(--teal);
+}
+.step.outcome > .marker {
+  border-color: var(--teal);
+  background: var(--mint);
+}
+.step.failed > .marker {
+  border-color: var(--rose);
+  background: #f6e3e1;
+}
+.note .marker {
+  top: 6px;
+  left: 5px;
+  width: 8px;
+  height: 8px;
+  border: 0;
+  background: #c9d6d0;
+}
+.stopped .marker {
+  border-style: dashed;
+}
+.kicker {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--teal-ink);
+}
+.step.failed .kicker {
+  color: var(--rose-ink);
+}
+.said blockquote {
+  margin: 4px 0 0;
+  padding: 10px 14px;
+  border-radius: 4px 14px 14px 14px;
+  background: var(--mint);
+  font-size: 16px;
   font-weight: 500;
-  line-height: 1.4;
-  letter-spacing: -0.01em;
+  line-height: 1.45;
+  white-space: pre-line;
   user-select: text;
 }
-#meta {
-  margin: 6px 0 20px;
+.note .body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: pre-line;
+  user-select: text;
+}
+.tool .head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tool .label {
+  font-weight: 500;
+}
+.at {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.tool .detail {
+  display: block;
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--soft);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+.output {
+  margin-top: 4px;
+}
+.output summary {
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tool.failed .output summary {
+  color: var(--rose-ink);
+}
+.output pre {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+.step.outcome > .body {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.step.outcome .result {
+  margin-top: 6px;
 }
 
 .result {
@@ -227,51 +372,6 @@ blockquote {
   font-size: 12px;
 }
 
-details {
-  margin-top: 20px;
-  border-top: 1px solid var(--line);
-  padding-top: 12px;
-}
-summary {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-2);
-  cursor: pointer;
-}
-#steps,
-#approvals {
-  margin: 10px 0 0;
-  font-size: 13px;
-  color: var(--ink-2);
-}
-#steps {
-  padding-left: 22px;
-}
-#steps li + li {
-  margin-top: 3px;
-}
-#approvals {
-  padding: 0;
-  list-style: none;
-}
-#approvals li + li {
-  margin-top: 12px;
-}
-.tool {
-  margin-left: 8px;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--muted);
-}
-.ahead {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.ahead .tool {
-  margin: 0 6px 0 4px;
-  color: var(--ink);
-}
 .badge {
   padding: 2px 8px;
   border-radius: 999px;
@@ -282,25 +382,14 @@ summary {
   background: var(--mint);
   color: var(--teal-ink);
 }
+.badge.auto {
+  background: var(--soft);
+  color: var(--muted);
+}
 .badge.no {
   background: #f6e3e1;
   color: var(--rose-ink);
 }
-.input {
-  margin: 6px 0 0;
-  padding: 8px 10px;
-  max-height: 120px;
-  overflow: auto;
-  border-radius: 8px;
-  background: var(--soft);
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-all;
-  user-select: text;
-}
-
 .files {
   display: flex;
   flex-wrap: wrap;
