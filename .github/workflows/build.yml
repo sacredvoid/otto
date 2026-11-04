@@ -1,0 +1,67 @@
+# Every push to main and every PR: tests, then a DMG kept as a workflow artifact.
+# A pushed tag like v0.2.0 also publishes that DMG as a GitHub Release.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write # only used by the release step on tags
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    runs-on: macos-14 # Apple Silicon, matches the aarch64 DMG
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Cache speech model
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: whisper-ggml-base.en
+
+      - run: npm ci
+
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test
+
+      - name: Build Otto.app and DMG
+        run: npm run tauri build
+
+      - name: Keep the DMG with this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: Otto-${{ github.sha }}
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+          retention-days: 14
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          dmg=$(ls src-tauri/target/release/bundle/dmg/*.dmg)
+          cp "$dmg" "Otto-${TAG#v}-AppleSilicon.dmg"
+          gh release create "$TAG" "Otto-${TAG#v}-AppleSilicon.dmg" \
+            --title "Otto ${TAG#v}" --generate-notes \
+            --notes "Apple Silicon, macOS 13+. Needs Claude Code installed and logged in. Open the DMG, drag Otto to Applications, then on first launch use System Settings > Privacy & Security > Open Anyway (this build isn't notarized yet)."

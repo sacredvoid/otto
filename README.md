@@ -103,7 +103,7 @@ DESIGN.md       the design doc and build plan
 - [x] Corner chip, approval cards, onboarding, History
 - [x] Connectors, memory, Mac app control
 - [ ] Other AI backends: Codex CLI, Gemini CLI, OpenAI-compatible APIs, Ollama
-- [x] Downloadable DMG
+- [x] Downloadable DMG, built by CI; tagged versions become releases
 - [ ] Notarized build with auto-update
 
 ## Status
