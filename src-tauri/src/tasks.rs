@@ -165,7 +165,7 @@ fn run(app: &AppHandle, job: &Job) {
         return fail("Claude Code isn't installed (or set OTTO_CLAUDE to its path).".into());
     };
     let gate = app.state::<Arc<Gate>>().inner().clone();
-    gate.register(job.id, &job.dir, &job.title);
+    gate.register(job.id, &job.dir, &job.title, readable_dirs());
     let child = claude_command(&claude, &job.prompt, &job.dir, &gate.url(job.id))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -270,7 +270,8 @@ fn readable_dirs() -> Vec<PathBuf> {
 fn system_prompt(readable: &[PathBuf]) -> String {
     let list = readable.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ");
     format!(
-        "{SYSTEM_PROMPT} Folders you can read: {list}. Map spoken folder names to these \
+        "{SYSTEM_PROMPT} Folders you can read: {list}. To locate files, use the find_files tool \
+(Spotlight) first; it is far faster than Grep. Map spoken folder names to these \
 (\"documents local\" may mean a folder like Documents-Local). When looking for files, never \
 search a whole folder tree at once: list the top level first, pick likely subfolders, and skip \
 dependency and build folders (node_modules, .venv, venv, site-packages, target, dist, build, .git)."

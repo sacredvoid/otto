@@ -47,6 +47,8 @@ struct TaskCtx {
     seen: HashSet<String>,
     /// File names this task wrote, shown alongside any command that mentions them.
     written: HashSet<String>,
+    /// Folders find_files may search.
+    readable: Vec<PathBuf>,
 }
 
 pub struct Gate {
@@ -92,9 +94,10 @@ impl Gate {
         format!("http://127.0.0.1:{}/mcp/{}/{}", self.port, self.token, task_id)
     }
 
-    pub fn register(&self, task_id: u64, dir: &Path, title: &str) {
+    pub fn register(&self, task_id: u64, dir: &Path, title: &str, readable: Vec<PathBuf>) {
         let dir = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
-        self.tasks.lock().unwrap().insert(task_id, TaskCtx { dir, title: title.into(), ..Default::default() });
+        let ctx = TaskCtx { dir, title: title.into(), readable, ..Default::default() };
+        self.tasks.lock().unwrap().insert(task_id, ctx);
     }
 
     pub fn unregister(&self, task_id: u64) {
@@ -254,6 +257,19 @@ impl Gate {
             })),
             "ping" => Ok(json!({})),
             "tools/list" => Ok(json!({ "tools": [{
+                "name": "find_files",
+                "description": "Find files on the user's Mac with Spotlight, limited to the folders Otto may read. \
+Much faster than Grep or Glob across big folders. Matches file contents and names; set name_only to match names only. \
+Returns up to 50 paths, skipping dependency and build folders.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": { "type": "string", "description": "Words to look for, e.g. attention sink" },
+                        "name_only": { "type": "boolean" }
+                    },
+                    "required": ["query"]
+                }
+            }, {
                 "name": "approve",
                 "description": "Otto's permission check. Called by Claude Code, not by the model.",
                 "inputSchema": {
@@ -266,6 +282,17 @@ impl Gate {
                     "required": ["tool_name", "input"]
                 }
             }]})),
+            "tools/call" if params["name"] == "find_files" => {
+                let args = &params["arguments"];
+                let query = args["query"].as_str().unwrap_or("").trim();
+                if query.is_empty() || query.len() > 200 {
+                    return Err((-32602, "query must be 1 to 200 characters".into()));
+                }
+                let readable = self.tasks.lock().unwrap().get(&task_id).map(|c| c.readable.clone()).unwrap_or_default();
+                let found = find_files(&readable, query, args["name_only"] == true);
+                let text = if found.is_empty() { "No matches.".to_string() } else { found.join("\n") };
+                Ok(json!({ "content": [{ "type": "text", "text": text }] }))
+            }
             "tools/call" if params["name"] == "approve" => {
                 let args = &params["arguments"];
                 let tool = args["tool_name"].as_str().unwrap_or("");
@@ -284,12 +311,40 @@ impl Gate {
     }
 }
 
+const SKIP_DIRS: [&str; 9] =
+    ["/node_modules/", "/.venv/", "/venv/", "/site-packages/", "/target/", "/.git/", "/dist/", "/build/", "/Library/"];
+
+/// Spotlight search across the readable folders. No shell: the query is a plain argument.
+// ponytail: no timeout on mdfind; it answers from the index in well under a second.
+fn find_files(readable: &[PathBuf], query: &str, name_only: bool) -> Vec<String> {
+    let mut out = Vec::new();
+    for dir in readable {
+        let mut cmd = std::process::Command::new("mdfind");
+        cmd.arg("-onlyin").arg(dir);
+        if name_only {
+            cmd.arg("-name");
+        }
+        let Ok(o) = cmd.arg(query).output() else { continue };
+        out.extend(
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .filter(|p| !SKIP_DIRS.iter().any(|s| p.contains(s)))
+                .map(String::from),
+        );
+    }
+    out.sort();
+    out.dedup();
+    out.truncate(50);
+    out
+}
+
 /// The policy. Pure, so it's unit tested below.
 fn classify(ctx: &TaskCtx, tool: &str, input: &Value) -> Verdict {
     let s = |k: &str| input[k].as_str().unwrap_or("").to_string();
     let ask = |summary: &str, detail: String| Verdict::Ask { summary: summary.into(), detail };
     match tool {
-        "TodoWrite" => Verdict::Allow,
+        // Otto's own read-only Spotlight search, confined to the readable folders.
+        "TodoWrite" | "mcp__otto__find_files" => Verdict::Allow,
         "Write" | "Edit" | "MultiEdit" | "NotebookEdit" => {
             let path = s("file_path");
             let p = Path::new(&path);
@@ -450,6 +505,7 @@ mod tests {
         assert!(matches!(classify(&c, "Bash", &json!({ "command": "sudo rm -rf /" })), Verdict::Block(_)));
         assert!(is_ask(&classify(&c, "mcp__gmail__label_thread", &json!({}))), "unknown MCP tools ask");
         assert_eq!(classify(&c, "WebSearch", &json!({ "query": "x" })), Verdict::Allow);
+        assert_eq!(classify(&c, "mcp__otto__find_files", &json!({ "query": "x" })), Verdict::Allow);
         c.tainted = true;
         assert!(is_ask(&classify(&c, "WebSearch", &json!({ "query": "x" }))));
         assert!(is_ask(&classify(&c, "WebFetch", &json!({ "url": "https://x" }))));
@@ -479,7 +535,7 @@ mod tests {
         let (c, root) = ctx();
         let (tx, rx) = mpsc::channel::<Ask>();
         let gate = Gate::start(&root.join("audit.jsonl"), move |a| tx.send(a).unwrap()).unwrap();
-        gate.register(1, &c.dir, "e2e");
+        gate.register(1, &c.dir, "e2e", vec![]);
         let url = if answer.is_some() { gate.url(1) } else { "http://127.0.0.1:9/mcp/nope/1".into() };
         let g = gate.clone();
         let asks = std::thread::spawn(move || {
