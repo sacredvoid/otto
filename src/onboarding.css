@@ -66,6 +66,9 @@ section:not([hidden]) {
   height: 100%;
   display: flex;
   flex-direction: column;
+  /* Long steps (sign-in, errors) scroll instead of being cut off by the fixed window. */
+  overflow-y: auto;
+  padding-bottom: 12px;
 }
 section.center:not([hidden]) {
   align-items: center;
@@ -162,7 +165,7 @@ input[type="radio"] {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 0;
+  padding: 8px 0;
   border-top: 1px solid var(--line);
 }
 .ai label {
