@@ -74,6 +74,14 @@ function inline(parent: HTMLElement, text: string) {
   if (at < text.length) parent.append(text.slice(at));
 }
 
+/** Claude ends every answer with a one-line recap for the notification. When there's a
+ * body above it, the recap only repeats it, so the expanded view drops it. */
+export function withoutRecap(src: string): string {
+  const paras = src.trim().split(/\n\s*\n/);
+  const last = paras[paras.length - 1].trimStart();
+  return paras.length > 1 && !last.startsWith("```") ? paras.slice(0, -1).join("\n\n") : src;
+}
+
 export function renderMarkdown(src: string): DocumentFragment {
   const frag = document.createDocumentFragment();
   for (const b of parse(src)) {

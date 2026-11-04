@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { renderMarkdown } from "./markdown";
+import { renderMarkdown, withoutRecap } from "./markdown";
 
 type Status = "queued" | "running" | "done" | "failed" | "needs_you";
 type TaskEvent = { id: number; title: string; status: Exclude<Status, "needs_you">; step: string | null; summary: string | null };
@@ -120,7 +120,7 @@ async function toggleDetails(id: number) {
   card.dataset.expanded = "1";
   const d = await invoke<Details>("task_details", { id });
   const result = el("div", "result");
-  result.append(d.summary ? renderMarkdown(d.summary) : "No summary.");
+  result.append(d.summary ? renderMarkdown(withoutRecap(d.summary)) : "No summary.");
   result.tabIndex = 0;
   extra.replaceChildren(result);
   if (d.files.length) {

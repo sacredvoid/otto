@@ -60,9 +60,10 @@ const FOLLOW_UP_WINDOW: std::time::Duration = std::time::Duration::from_secs(10 
 /// Openers that refer back to the last task ("no, make it shorter", "try again").
 // ponytail: a phrase list, so "also book a flight" joins the last task. Cheap to be wrong:
 // Claude still does it, just in the previous folder. Swap for a model call if it misfires often.
-const FOLLOW_UP_OPENERS: [&str; 24] = [
+const FOLLOW_UP_OPENERS: [&str; 27] = [
     "no", "nope", "actually", "also", "and", "instead", "but", "wait", "make it", "make that",
     "change it", "change that", "do that", "do the same", "same for", "same thing", "try again",
+    "try it", "do it again", "one more",
     "redo", "again", "send it", "send that", "shorter", "longer", "undo",
 ];
 
@@ -610,6 +611,7 @@ mod tests {
         assert!(is_follow_up("No, make it shorter."));
         assert!(is_follow_up("make it formal"));
         assert!(is_follow_up("...try again"));
+        assert!(is_follow_up("Try it again but make it hilarious."));
         assert!(!is_follow_up("Notes for tomorrow"), "prefix of a longer word");
         assert!(!is_follow_up("Add milk to my reminders"));
         assert_eq!(title_of("Summarize the lease."), "Summarize the lease");

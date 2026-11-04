@@ -69,6 +69,8 @@ struct TaskCtx {
     readable: Vec<PathBuf>,
     /// Extra tools the user allowed in config.json ("allow_tools").
     allow: Vec<String>,
+    /// The user allowed a web search in this task; later ones run without asking.
+    web_ok: bool,
 }
 
 pub struct Gate {
@@ -209,6 +211,11 @@ impl Gate {
                 self.pending.lock().unwrap().remove(&approval_id);
                 match answer {
                     Ok(true) => {
+                        if tool == "WebSearch" {
+                            if let Some(c) = self.tasks.lock().unwrap().get_mut(&task_id) {
+                                c.web_ok = true;
+                            }
+                        }
                         self.log(task_id, tool, input, "allow", "user");
                         Ok(())
                     }
@@ -451,7 +458,8 @@ fn classify(ctx: &TaskCtx, tool: &str, input: &Value) -> Verdict {
             let summary = if cmd.contains("osascript") { "Control a Mac app" } else { "Run a command" };
             ask(summary, detail)
         }
-        "WebSearch" if !ctx.tainted => Verdict::Allow,
+        // ponytail: one OK covers every search in the task; queries stay visible in History.
+        "WebSearch" if !ctx.tainted || ctx.web_ok => Verdict::Allow,
         "WebFetch" if !ctx.tainted => Verdict::Allow,
         "WebSearch" => ask("Search the web (this task has read your files)", s("query")),
         "WebFetch" => ask("Open a web page (this task has read your files)", s("url")),
@@ -578,6 +586,9 @@ mod tests {
         c.tainted = true;
         assert!(is_ask(&classify(&c, "mcp__otto__remember", &json!({ "fact": "x" }))), "tainted memory writes ask");
         assert!(is_ask(&classify(&c, "WebSearch", &json!({ "query": "x" }))));
+        c.web_ok = true;
+        assert_eq!(classify(&c, "WebSearch", &json!({ "query": "y" })), Verdict::Allow, "one OK per task");
+        assert!(is_ask(&classify(&c, "WebFetch", &json!({ "url": "https://x" }))), "fetches still ask");
         assert!(is_ask(&classify(&c, "WebFetch", &json!({ "url": "https://x" }))));
 
         // A symlink inside the task folder pointing out is not "inside".

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { renderMarkdown } from "./markdown";
+import { renderMarkdown, withoutRecap } from "./markdown";
 
 type Status = "done" | "failed" | "incomplete";
 type Entry = { folder: string; created_unix: number; transcript: string; status: Status; preview: string };
@@ -143,7 +143,7 @@ function renderItem(it: Item, start: number): HTMLLIElement {
   if (it.duration_ms) head.append(el("span", "at", ` · took ${seconds(it.duration_ms)}`));
   const text = el("div", "result");
   text.tabIndex = 0;
-  text.append(it.ok ? (it.text ? renderMarkdown(it.text) : el("p", "muted", "No summary.")) : el("p", "error", it.text));
+  text.append(it.ok ? (it.text ? renderMarkdown(withoutRecap(it.text)) : el("p", "muted", "No summary.")) : el("p", "error", it.text));
   body.append(head, text);
   return node(`outcome${it.ok ? "" : " failed"}`, body);
 }
