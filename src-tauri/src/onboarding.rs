@@ -45,6 +45,10 @@ pub struct Info {
     /// TODO: real download. For now "ready" just means the file exists.
     model_ready: bool,
     folders: Vec<String>,
+    /// Current "disabled" list, so reopening setup shows the saved toggles.
+    disabled: Vec<String>,
+    /// Plugins named in config.json ("plugins").
+    plugins: Vec<String>,
 }
 
 #[tauri::command]
@@ -65,7 +69,11 @@ pub fn onboarding_info() -> Info {
         .collect();
     extra.sort();
     folders.extend(extra);
-    Info { model_ready: crate::stt::default_model_path().is_file(), folders }
+    let config = crate::tasks::config();
+    let list = |k: &str| -> Vec<String> {
+        config[k].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect()).unwrap_or_default()
+    };
+    Info { model_ready: crate::stt::default_model_path().is_file(), folders, disabled: list("disabled"), plugins: list("plugins") }
 }
 
 #[derive(Serialize)]
@@ -149,9 +157,72 @@ pub fn open_settings(pane: String) {
     let _ = Command::new("open").arg(url).spawn();
 }
 
+/// A connector or plugin server Claude Code loaded for this account.
+#[derive(Serialize)]
+pub struct Server {
+    /// Tool prefix, e.g. "mcp__claude_ai_Gmail". Switching it off denies every tool under it.
+    key: String,
+    name: String,
+    tools: Vec<String>,
+}
+
+/// Starts Claude Code the way a task would and reads its first event, which lists the
+/// connectors it loaded. Killed right after, before any request reaches the model.
+#[tauri::command]
+pub async fn detect_connectors() -> Result<Vec<Server>, String> {
+    use std::io::BufRead;
+    let claude = crate::tasks::claude_bin().ok_or("Claude Code isn't installed")?;
+    let config = crate::tasks::config();
+    let plugins: Map<String, Value> = config["plugins"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|p| p.as_str())
+        .map(|p| (p.to_string(), Value::Bool(true)))
+        .collect();
+    let mut child = Command::new(claude)
+        .args(["-p", "ok", "--output-format", "stream-json", "--verbose", "--restricted", "--tools", "Read"])
+        .arg("--settings")
+        .arg(json!({ "enabledPlugins": plugins }).to_string())
+        .current_dir(std::env::temp_dir())
+        .env("MCP_CONNECTION_NONBLOCKING", "false")
+        .env_remove("CLAUDE_CODE_PLUGIN_DIRS")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|e| format!("couldn't start Claude Code: {e}"))?;
+    let stdout = child.stdout.take().ok_or("no output")?;
+    // ponytail: no timeout of our own; init arrives in a few seconds or the CLI exits on error.
+    let init = std::io::BufReader::new(stdout)
+        .lines()
+        .map_while(Result::ok)
+        .filter_map(|l| serde_json::from_str::<Value>(&l).ok())
+        .find(|v| v["subtype"] == "init");
+    let _ = child.kill();
+    let _ = child.wait();
+    let init = init.ok_or("Claude Code didn't start (is it logged in?)")?;
+    let mut servers: Vec<Server> = Vec::new();
+    for tool in init["tools"].as_array().into_iter().flatten().filter_map(|t| t.as_str()) {
+        let Some(rest) = tool.strip_prefix("mcp__") else { continue };
+        let Some((server, name)) = rest.split_once("__") else { continue };
+        let key = format!("mcp__{server}");
+        match servers.iter_mut().find(|s| s.key == key) {
+            Some(s) => s.tools.push(name.replace('_', " ")),
+            None => {
+                let label = server.strip_prefix("claude_ai_").unwrap_or(server).replace('_', " ");
+                servers.push(Server { key, name: label, tools: vec![name.replace('_', " ")] });
+            }
+        }
+    }
+    // Plugin servers are switched off as plugins (see the Plugins list), not here.
+    servers.retain(|s| s.key.starts_with("mcp__claude_ai_"));
+    Ok(servers)
+}
+
 /// Saves the choices, keeping any other keys, then closes the window.
 #[tauri::command]
-pub fn finish_onboarding(app: AppHandle, readable_dirs: Vec<String>) -> Result<(), String> {
+pub fn finish_onboarding(app: AppHandle, readable_dirs: Vec<String>, disabled: Vec<String>) -> Result<(), String> {
     let home = home();
     // Only "~/Name" folders that exist; the webview is not trusted to name paths.
     let dirs: Vec<&String> = readable_dirs
@@ -161,8 +232,15 @@ pub fn finish_onboarding(app: AppHandle, readable_dirs: Vec<String>) -> Result<(
                 .is_some_and(|r| !r.is_empty() && !r.split('/').any(|p| p.is_empty() || p == "..") && home.join(r).is_dir())
         })
         .collect();
+    // Tool names, server prefixes or "plugin:name"; nothing that could be a flag or a path.
+    let ok = |d: &&String| {
+        !d.is_empty() && d.len() <= 200 && !d.starts_with('-')
+            && d.chars().all(|c| c.is_ascii_alphanumeric() || "_-:@.".contains(c))
+    };
+    let disabled: Vec<&String> = disabled.iter().filter(ok).take(200).collect();
     let mut config = read_config();
     config.insert("readable_dirs".into(), json!(dirs));
+    config.insert("disabled".into(), json!(disabled));
     config.insert("onboarded".into(), json!(true));
     let path = config_path();
     std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;

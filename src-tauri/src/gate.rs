@@ -71,6 +71,8 @@ struct TaskCtx {
     allow: Vec<String>,
     /// The user allowed a web search in this task; later ones run without asking.
     web_ok: bool,
+    /// Tools and servers switched off in setup ("disabled" in config.json).
+    disabled: Vec<String>,
 }
 
 pub struct Gate {
@@ -116,9 +118,9 @@ impl Gate {
         format!("http://127.0.0.1:{}/mcp/{}/{}", self.port, self.token, task_id)
     }
 
-    pub fn register(&self, task_id: u64, dir: &Path, title: &str, readable: Vec<PathBuf>, allow: Vec<String>) {
+    pub fn register(&self, task_id: u64, dir: &Path, title: &str, readable: Vec<PathBuf>, allow: Vec<String>, disabled: Vec<String>) {
         let dir = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
-        let ctx = TaskCtx { dir, title: title.into(), readable, allow, ..Default::default() };
+        let ctx = TaskCtx { dir, title: title.into(), readable, allow, disabled, ..Default::default() };
         self.tasks.lock().unwrap().insert(task_id, ctx);
     }
 
@@ -411,6 +413,9 @@ fn tool_label(tool: &str) -> String {
 fn classify(ctx: &TaskCtx, tool: &str, input: &Value) -> Verdict {
     let s = |k: &str| input[k].as_str().unwrap_or("").to_string();
     let ask = |summary: &str, detail: String| Verdict::Ask { summary: summary.into(), detail };
+    if crate::tasks::is_disabled(&ctx.disabled, tool) {
+        return Verdict::Block("you turned this off in Otto's setup".into());
+    }
     match tool {
         // Otto's own read-only Spotlight search, confined to the readable folders.
         "TodoWrite" | "mcp__otto__find_files" => Verdict::Allow,
@@ -587,6 +592,9 @@ mod tests {
         assert!(is_ask(&classify(&c, "mcp__otto__remember", &json!({ "fact": "x" }))), "tainted memory writes ask");
         assert!(is_ask(&classify(&c, "WebSearch", &json!({ "query": "x" }))));
         c.web_ok = true;
+        c.disabled = vec!["mcp__claude_ai_Gmail".into()];
+        assert!(matches!(classify(&c, "mcp__claude_ai_Gmail__search_threads", &json!({})), Verdict::Block(_)), "off beats auto-allow");
+        c.disabled.clear();
         assert_eq!(classify(&c, "WebSearch", &json!({ "query": "y" })), Verdict::Allow, "one OK per task");
         assert!(is_ask(&classify(&c, "WebFetch", &json!({ "url": "https://x" }))), "fetches still ask");
         assert!(is_ask(&classify(&c, "WebFetch", &json!({ "url": "https://x" }))));
@@ -616,7 +624,7 @@ mod tests {
         let (c, root) = ctx();
         let (tx, rx) = mpsc::channel::<Ask>();
         let gate = Gate::start(&root.join("audit.jsonl"), move |a| tx.send(a).unwrap()).unwrap();
-        gate.register(1, &c.dir, "e2e", vec![], vec![]);
+        gate.register(1, &c.dir, "e2e", vec![], vec![], vec![]);
         let url = if answer.is_some() { gate.url(1) } else { "http://127.0.0.1:9/mcp/nope/1".into() };
         let g = gate.clone();
         let asks = std::thread::spawn(move || {

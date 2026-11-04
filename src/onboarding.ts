@@ -1,10 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-type Info = { model_ready: boolean; folders: string[] };
+type Info = { model_ready: boolean; folders: string[]; disabled: string[]; plugins: string[] };
+type Server = { key: string; name: string; tools: string[] };
+/** One switch. `off` is what goes in config "disabled" when it is switched off. */
+type Cap = { name: string; what: string; asks: string; off: string[] | null };
 type Detected = { claude: boolean; codex: boolean; gemini: boolean; ollama: boolean };
 
-const LAST = 5;
+const LAST = 6;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const steps = [...document.querySelectorAll<HTMLElement>("[data-step]")];
 const back = $<HTMLButtonElement>("back");
@@ -12,6 +15,9 @@ const next = $<HTMLButtonElement>("next");
 let step = 1;
 let folders: string[] = [];
 const chosen = new Set<string>();
+const disabled = new Set<string>();
+let plugins: string[] = [];
+let servers: Server[] | string | null = null; // null = still checking, string = error
 let micTimer: number | undefined;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text?: string) {
@@ -66,6 +72,56 @@ function renderFolders() {
   }
 }
 
+const BUILT_IN: Cap[] = [
+  { name: "Read and write files", what: "Reads the folders you picked. Writes only inside each task's own folder.", asks: "Always on", off: null },
+  { name: "Run commands and control Mac apps", what: "Shell commands, AppleScript, Shortcuts and screenshots.", asks: "Asks every time", off: ["Bash"] },
+  { name: "Web search and web pages", what: "Looks things up online.", asks: "Asks once a task has read your files", off: ["WebSearch", "WebFetch"] },
+  { name: "Spotlight search", what: "Finds files fast, only inside your picked folders.", asks: "Automatic", off: ["mcp__otto__find_files"] },
+  { name: "Memory", what: "Saves short notes about you to ~/Otto/memory.md.", asks: "Automatic", off: ["mcp__otto__remember"] },
+];
+
+function capRow(c: Cap) {
+  const row = el("div", "cap");
+  const text = el("div", "grow");
+  text.append(el("span", "name", c.name), el("span", "muted small", c.what));
+  const tag = el("span", "tag", c.asks);
+  row.append(text, tag);
+  if (!c.off) return row;
+  const off = c.off;
+  const sw = el("input", "switch");
+  sw.type = "checkbox";
+  sw.setAttribute("role", "switch");
+  sw.setAttribute("aria-label", c.name);
+  sw.checked = !off.every((k) => disabled.has(k));
+  sw.addEventListener("change", () => off.forEach((k) => (sw.checked ? disabled.delete(k) : disabled.add(k))));
+  row.append(sw);
+  return row;
+}
+
+function renderCaps() {
+  const box = $("caps");
+  const group = (title: string, ...rows: HTMLElement[]) => {
+    const g = el("div", "cap-group");
+    g.append(el("h2", "", title), ...rows);
+    return g;
+  };
+  const connectors =
+    servers === null
+      ? [el("p", "muted small", "Checking your Claude account\u2026")]
+      : typeof servers === "string"
+        ? [el("p", "muted small", `Couldn't check connectors: ${servers}`)]
+        : servers.length
+          ? servers.map((s) =>
+              capRow({ name: s.name, what: `${s.tools.length} tools: ${s.tools.slice(0, 4).join(", ")}${s.tools.length > 4 ? "\u2026" : ""}`, asks: "Reading is automatic; changes ask", off: [s.key] }),
+            )
+          : [el("p", "muted small", "No connectors on this Claude account. Add them at claude.ai, Settings, Connectors.")];
+  const groups = [group("Built in", ...BUILT_IN.map(capRow)), group("From your Claude account", ...connectors)];
+  if (plugins.length) {
+    groups.push(group("Plugins", ...plugins.map((p) => capRow({ name: p.split("@")[0], what: `Claude Code plugin ${p}`, asks: "Asks unless allowed in config", off: [`plugin:${p}`] }))));
+  }
+  box.replaceChildren(...groups);
+}
+
 function renderAis(d: Detected) {
   const rows: [string, boolean, boolean][] = [
     ["Claude Code", d.claude, true],
@@ -98,7 +154,7 @@ next.addEventListener("click", async () => {
   if (step < LAST) return show(step + 1);
   next.disabled = true;
   try {
-    await invoke("finish_onboarding", { readableDirs: [...chosen] });
+    await invoke("finish_onboarding", { readableDirs: [...chosen], disabled: [...disabled] });
   } catch (e) {
     $("error").textContent = String(e);
     $("error").hidden = false;
@@ -124,5 +180,12 @@ listen<{ state: string; text: string | null }>("otto://pill", (e) => {
   folders = info.folders;
   folders.forEach((f) => chosen.add(f));
   renderFolders();
+  info.disabled.forEach((d) => disabled.add(d));
+  plugins = info.plugins;
+  renderCaps();
+  invoke<Server[]>("detect_connectors")
+    .then((s) => (servers = s))
+    .catch((e) => (servers = String(e)))
+    .finally(renderCaps);
   renderAis(await invoke<Detected>("onboarding_detect"));
 })();

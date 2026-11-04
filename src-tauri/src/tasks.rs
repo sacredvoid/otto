@@ -223,7 +223,7 @@ fn run(app: &AppHandle, job: &Job) {
         return fail("Claude Code isn't installed (or set OTTO_CLAUDE to its path).".into());
     };
     let gate = app.state::<Arc<Gate>>().inner().clone();
-    gate.register(job.id, &job.dir, &job.title, readable_dirs(), allow_tools());
+    gate.register(job.id, &job.dir, &job.title, readable_dirs(), allow_tools(), disabled());
     let mut cmd = claude_command(&claude, &job.prompt, &job.dir, &gate.url(job.id));
     if let Some(session) = &job.resume {
         // The resumed conversation may already hold private data, so start tainted.
@@ -322,6 +322,8 @@ const TOOLS: &str = "Read,Write,Edit,Glob,Grep,Bash,WebSearch,WebFetch,TodoWrite
 /// - "plugins": ["claude-mem@thedotmack"] Claude Code plugins to load (e.g. a memory plugin)
 /// - "mcp_servers": { "name": {...} } extra MCP servers, same shape as .mcp.json
 /// - "allow_tools": ["mcp__server__tool"] tools that run without asking (read-only ones only)
+/// - "disabled": ["Bash", "mcp__claude_ai_Gmail", "plugin:claude-mem@thedotmack"] tools, servers
+///   (every tool under that prefix) or plugins Otto must not use. Set from the setup window.
 /// - "model": "sonnet" Claude model for tasks (default: your Claude Code default). Faster models answer sooner.
 pub(crate) fn config() -> Value {
     std::fs::read(otto_dir().join("config.json"))
@@ -341,6 +343,15 @@ fn strings(v: &Value) -> Vec<String> {
 
 pub(crate) fn allow_tools() -> Vec<String> {
     strings(&config()["allow_tools"])
+}
+
+pub(crate) fn disabled() -> Vec<String> {
+    strings(&config()["disabled"])
+}
+
+/// True if `tool` is switched off: named exactly, or it belongs to a switched-off server.
+pub(crate) fn is_disabled(disabled: &[String], tool: &str) -> bool {
+    disabled.iter().any(|d| tool == d || tool.strip_prefix(d.as_str()).is_some_and(|rest| rest.starts_with("__")))
 }
 
 /// Folders Otto may read without asking (still taints the task for web access).
@@ -438,14 +449,21 @@ pub(crate) fn claude_command(claude: &Path, prompt: &str, dir: &Path, gate_url: 
     let config = config();
     let mut servers = config["mcp_servers"].as_object().cloned().unwrap_or_default();
     servers.insert("otto".into(), serde_json::json!({ "type": "http", "url": gate_url })); // can't be overridden
-    let plugins: serde_json::Map<String, Value> =
-        strings(&config["plugins"]).into_iter().map(|p| (p, Value::Bool(true))).collect();
+    let off = strings(&config["disabled"]);
+    let plugins: serde_json::Map<String, Value> = strings(&config["plugins"])
+        .into_iter()
+        .filter(|p| !off.contains(&format!("plugin:{p}")))
+        .map(|p| (p, Value::Bool(true)))
+        .collect();
+    let tools: Vec<&str> = TOOLS.split(',').filter(|t| !is_disabled(&off, t)).collect();
+    // Turned-off tools and servers, denied by Claude Code itself (the gate blocks them too).
+    let deny: Vec<&str> = off.iter().map(String::as_str).filter(|d| !d.starts_with("plugin:")).collect();
     let readable = readable_dirs();
     let mut cmd = Command::new(claude);
     cmd.arg("-p")
         .arg(prompt)
         .args(["--output-format", "stream-json", "--verbose"])
-        .args(["--restricted", "--tools", TOOLS])
+        .args(["--restricted", "--tools", &tools.join(",")])
         .arg("--mcp-config")
         .arg(serde_json::json!({ "mcpServers": servers }).to_string())
         .arg("--settings")
@@ -460,6 +478,9 @@ pub(crate) fn claude_command(claude: &Path, prompt: &str, dir: &Path, gate_url: 
         .env_remove("CLAUDE_CODE_PLUGIN_DIRS")
         // Approvals can take minutes; don't let Claude Code time out the gate call first.
         .env("MCP_TOOL_TIMEOUT", (gate::APPROVAL_TIMEOUT.as_millis() + 60_000).to_string());
+    if !deny.is_empty() {
+        cmd.arg(format!("--disallowedTools={}", deny.join(",")));
+    }
     if let Some(model) = config["model"].as_str().filter(|m| !m.is_empty()) {
         cmd.arg("--model").arg(model);
     }
@@ -619,6 +640,11 @@ mod tests {
         assert!(is_follow_up("make it formal"));
         assert!(is_follow_up("...try again"));
         assert!(is_follow_up("Try it again but make it hilarious."));
+        let off = vec!["mcp__claude_ai_Gmail".to_string(), "Bash".to_string()];
+        assert!(is_disabled(&off, "mcp__claude_ai_Gmail__send_message"));
+        assert!(is_disabled(&off, "Bash"));
+        assert!(!is_disabled(&off, "mcp__claude_ai_Gmail2__x"), "prefix must end at a server boundary");
+        assert!(!is_disabled(&off, "Read"));
         assert!(!is_follow_up("Notes for tomorrow"), "prefix of a longer word");
         assert!(!is_follow_up("Add milk to my reminders"));
         assert_eq!(title_of("Summarize the lease."), "Summarize the lease");
