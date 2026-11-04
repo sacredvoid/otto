@@ -42,6 +42,10 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: s
   return e;
 }
 
+function cancelButton(id: number) {
+  return button("Cancel", "link", () => invoke("cancel_task", { id }));
+}
+
 function getCard(id: number): HTMLElement {
   let card = cards.get(id);
   if (card) return card;
@@ -98,6 +102,8 @@ function render(t: TaskEvent) {
     armDismiss(t.id);
   } else if (t.status === "failed") {
     actions.append(button("Show in Finder", "link", () => invoke("show_task_folder", { id: t.id })));
+  } else {
+    actions.append(cancelButton(t.id));
   }
 }
 
@@ -138,11 +144,13 @@ function renderApproval(a: Approval) {
   const answer = (allow: boolean) => {
     invoke("answer_approval", { approvalId: a.approval_id, allow });
     setStatus(card, "running");
+    card.querySelector(".actions")!.append(cancelButton(a.task_id));
     card.querySelector(".sub")!.textContent = allow ? "Allowed, continuing" : "Skipped, continuing";
   };
   card.querySelector(".actions")!.replaceChildren(
     button("Allow", "solid", () => answer(true)),
     button("Don't allow", "link", () => answer(false)),
+    cancelButton(a.task_id),
   );
 }
 

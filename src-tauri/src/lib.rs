@@ -137,6 +137,11 @@ fn show_task_folder(tasks: tauri::State<tasks::Tasks>, id: u64) -> Result<(), St
 }
 
 #[tauri::command]
+fn cancel_task(app: AppHandle, id: u64) {
+    tasks::Tasks::cancel(&app, id);
+}
+
+#[tauri::command]
 fn answer_approval(gate: tauri::State<std::sync::Arc<gate::Gate>>, approval_id: u64, allow: bool) {
     gate.answer(approval_id, allow);
 }
@@ -162,7 +167,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(Otto::default())
         .manage(tasks::Tasks::default())
-        .invoke_handler(tauri::generate_handler![task_details, open_task_file, show_task_folder, answer_approval, set_toasts_height])
+        .invoke_handler(tauri::generate_handler![task_details, open_task_file, show_task_folder, cancel_task, answer_approval, set_toasts_height])
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcuts([HOTKEY])

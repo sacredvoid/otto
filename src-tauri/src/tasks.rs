@@ -55,6 +55,9 @@ struct Inner {
     running: usize,
     queue: VecDeque<Job>,
     dirs: HashMap<u64, PathBuf>,
+    /// Process ids of running tasks, for Cancel.
+    pids: HashMap<u64, u32>,
+    cancelled: std::collections::HashSet<u64>,
 }
 
 fn emit(app: &AppHandle, id: u64, title: &str, status: &'static str, step: Option<String>, summary: Option<String>) {
@@ -81,6 +84,22 @@ impl Tasks {
         emit(app, id, &title, "queued", None, None);
         start_ready(app);
         Ok(title)
+    }
+
+    /// Stops a running task, or drops it from the queue.
+    // ponytail: an approval card waiting on a cancelled task times out on its own (10 min).
+    pub fn cancel(app: &AppHandle, id: u64) {
+        let tasks = app.state::<Tasks>();
+        let mut inner = tasks.inner.lock().unwrap();
+        if let Some(pos) = inner.queue.iter().position(|j| j.id == id) {
+            let job = inner.queue.remove(pos).unwrap();
+            drop(inner);
+            return emit(app, id, &job.title, "failed", None, Some("Cancelled.".into()));
+        }
+        if let Some(pid) = inner.pids.get(&id).copied() {
+            inner.cancelled.insert(id);
+            let _ = Command::new("kill").arg("-TERM").arg(pid.to_string()).status();
+        }
     }
 
     pub fn dir(&self, id: u64) -> Option<PathBuf> {
@@ -160,6 +179,7 @@ fn run(app: &AppHandle, job: &Job) {
         }
     };
 
+    app.state::<Tasks>().inner.lock().unwrap().pids.insert(job.id, child.id());
     let mut stderr = child.stderr.take().unwrap();
     let stderr_reader = std::thread::spawn(move || {
         let mut s = String::new();
@@ -195,6 +215,16 @@ fn run(app: &AppHandle, job: &Job) {
     let status = child.wait();
     let stderr = stderr_reader.join().unwrap_or_default();
     gate.unregister(job.id);
+    let cancelled = {
+        let tasks = app.state::<Tasks>();
+        let mut inner = tasks.inner.lock().unwrap();
+        inner.pids.remove(&job.id);
+        inner.cancelled.remove(&job.id)
+    };
+    if cancelled {
+        println!("[otto] task {} cancelled", job.id);
+        return emit(app, job.id, &job.title, "failed", None, Some("Cancelled.".into()));
+    }
 
     match outcome {
         Some((true, summary)) => {
@@ -215,9 +245,36 @@ fn run(app: &AppHandle, job: &Job) {
 const TOOLS: &str = "Read,Write,Edit,Glob,Grep,Bash,WebSearch,WebFetch,TodoWrite";
 
 /// Folders Otto may read without asking (still taints the task for web access).
+/// Set in ~/Otto/config.json as {"readable_dirs": ["~/Documents", ...]};
+/// onboarding will write this. Defaults to Documents, Desktop, Downloads.
 fn readable_dirs() -> Vec<PathBuf> {
     let home = dirs::home_dir().unwrap_or_default();
-    ["Documents", "Desktop", "Downloads"].iter().map(|d| home.join(d)).filter(|p| p.is_dir()).collect()
+    let config: Value = std::fs::read(home.join("Otto/config.json"))
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default();
+    let listed: Vec<String> = config["readable_dirs"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_else(|| vec!["~/Documents".into(), "~/Desktop".into(), "~/Downloads".into()]);
+    listed
+        .iter()
+        .map(|d| match d.strip_prefix("~/") {
+            Some(rest) => home.join(rest),
+            None => PathBuf::from(d),
+        })
+        .filter(|p| p.is_absolute() && p.is_dir() && *p != home) // never the whole home folder
+        .collect()
+}
+
+fn system_prompt(readable: &[PathBuf]) -> String {
+    let list = readable.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ");
+    format!(
+        "{SYSTEM_PROMPT} Folders you can read: {list}. Map spoken folder names to these \
+(\"documents local\" may mean a folder like Documents-Local). When looking for files, never \
+search a whole folder tree at once: list the top level first, pick likely subfolders, and skip \
+dependency and build folders (node_modules, .venv, venv, site-packages, target, dist, build, .git)."
+    )
 }
 
 /// `--restricted` ignores the user's own Claude settings, hooks and allow-rules,
@@ -225,6 +282,7 @@ fn readable_dirs() -> Vec<PathBuf> {
 /// connectors come later with an explicit per-tool allowlist.
 pub(crate) fn claude_command(claude: &Path, prompt: &str, dir: &Path, gate_url: &str) -> Command {
     let mcp = serde_json::json!({ "mcpServers": { "otto": { "type": "http", "url": gate_url } } });
+    let readable = readable_dirs();
     let mut cmd = Command::new(claude);
     cmd.arg("-p")
         .arg(prompt)
@@ -233,11 +291,12 @@ pub(crate) fn claude_command(claude: &Path, prompt: &str, dir: &Path, gate_url: 
         .arg("--mcp-config")
         .arg(mcp.to_string())
         .args(["--permission-prompt-tool", "mcp__otto__approve"])
-        .args(["--append-system-prompt", SYSTEM_PROMPT])
+        .arg("--append-system-prompt")
+        .arg(system_prompt(&readable))
         .current_dir(dir)
         // Approvals can take minutes; don't let Claude Code time out the gate call first.
         .env("MCP_TOOL_TIMEOUT", (gate::APPROVAL_TIMEOUT.as_millis() + 60_000).to_string());
-    for d in readable_dirs() {
+    for d in &readable {
         cmd.arg("--add-dir").arg(d);
     }
     cmd
