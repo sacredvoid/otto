@@ -83,3 +83,5 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .bar::after { animation: none; width: 60%; }
 }
+
+.chip .tool-icon { margin-right: 0; }

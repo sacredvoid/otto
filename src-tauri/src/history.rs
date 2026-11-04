@@ -194,7 +194,7 @@ fn trace(dir: &Path, audit: &Path, folder: &str) -> Vec<Value> {
                             let input = &c["input"];
                             by_id.insert(c["id"].as_str().unwrap_or("").to_string(), items.len());
                             items.push(json!({
-                                "kind": "tool", "tool": tool, "label": tasks::describe_tool(tool, input),
+                                "kind": "tool", "tool": tool, "label": tasks::describe_tool(tool, input), "icon": tasks::tool_icon(tool, input),
                                 "detail": key_input(input), "approval": take_decision(&mut ds, tool, input),
                                 "output": Value::Null, "error": false, "ts": ts,
                             }));

@@ -40,6 +40,33 @@ body {
   border-color: var(--rose-line);
 }
 
+.avatar {
+  position: relative;
+  flex: none;
+  align-self: flex-start;
+}
+.app-badge:empty {
+  display: none;
+}
+.app-badge {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(20, 40, 50, 0.25);
+}
+.app-badge .tool-icon {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  animation-duration: 420ms;
+}
 .mascot {
   flex: none;
   width: 34px;

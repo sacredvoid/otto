@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { toolIcon } from "./icons";
 
-type TaskEvent = { id: number; title: string; status: "queued" | "running" | "done" | "failed"; step: string | null; summary: string | null };
+type TaskEvent = { id: number; title: string; status: "queued" | "running" | "done" | "failed"; step: string | null; summary: string | null; icon: string | null };
 type Approval = { task_id: number; summary: string };
 
 const root = document.getElementById("root")!;
@@ -26,7 +27,10 @@ function row(t: TaskEvent) {
   const r = el("div", needs ? "row needs-you" : "row");
   const top = el("div", "top");
   const status = needs ? "Waiting for you" : t.status === "queued" ? "Waiting for a free slot" : (t.step ?? "Working");
-  top.append(el("span", "title", t.title), el("span", "sub", status));
+  const sub = el("span", "sub");
+  if (!needs && t.status === "running" && t.icon) sub.append(toolIcon(t.icon));
+  sub.append(status);
+  top.append(el("span", "title", t.title), sub);
   r.append(top);
   if (needs) r.append(el("span", "sub", asks.get(t.id)));
   else if (t.status === "running") r.append(el("div", "bar"));
@@ -44,6 +48,9 @@ function render() {
   const mascot = el("span", "");
   mascot.innerHTML = needing ? NEEDS_YOU : WORKING; // static markup above
   chip.append(mascot);
+  // The newest step's logo, so a glance shows what Otto is touching right now.
+  const latest = all.filter((t) => t.status === "running" && t.icon && !asks.has(t.id)).pop();
+  if (latest) chip.append(toolIcon(latest.icon!));
   if (running) chip.append(el("span", "", `${running} running`));
   if (running && needing) chip.append(el("span", "sep"));
   if (needing) chip.append(el("span", "needs", `${needing} needs you`));

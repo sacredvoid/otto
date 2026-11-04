@@ -56,6 +56,7 @@ pub struct Ask {
     pub title: String,
     pub summary: String,
     pub detail: String,
+    pub icon: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -217,7 +218,7 @@ impl Gate {
                 let approval_id = self.next_approval.fetch_add(1, Ordering::SeqCst);
                 let (tx, rx) = mpsc::channel();
                 self.pending.lock().unwrap().insert(approval_id, tx);
-                (self.on_ask)(Ask { task_id, approval_id, title, summary, detail: clean(&detail) });
+                (self.on_ask)(Ask { task_id, approval_id, title, summary, detail: clean(&detail), icon: crate::tasks::tool_icon(tool, input) });
                 let answer = rx.recv_timeout(APPROVAL_TIMEOUT);
                 self.pending.lock().unwrap().remove(&approval_id);
                 match answer {

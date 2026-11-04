@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { renderMarkdown, withoutRecap } from "./markdown";
+import { setLine, toolIcon } from "./icons";
 
 type Status = "queued" | "running" | "done" | "failed" | "needs_you";
-type TaskEvent = { id: number; title: string; status: Exclude<Status, "needs_you">; step: string | null; summary: string | null };
-type Approval = { task_id: number; approval_id: number; title: string; summary: string; detail: string };
+type TaskEvent = { id: number; title: string; status: Exclude<Status, "needs_you">; step: string | null; summary: string | null; icon: string | null };
+type Approval = { task_id: number; approval_id: number; title: string; summary: string; detail: string; icon: string };
 type Details = { summary: string; files: string[] };
 
 const DONE_DISMISS_MS = 8000;
@@ -50,7 +51,7 @@ function getCard(id: number): HTMLElement {
   let card = cards.get(id);
   if (card) return card;
   card = el("article", "card");
-  card.innerHTML = `<div class="mascot"></div><div class="body"><p class="title"></p><p class="sub"></p><div class="extra"></div><div class="actions"></div></div>`;
+  card.innerHTML = `<div class="avatar"><div class="mascot"></div><span class="app-badge"></span></div><div class="body"><p class="title"></p><p class="sub"></p><div class="extra"></div><div class="actions"></div></div>`;
   const close = button("×", "link", () => remove(id));
   close.className = "close";
   close.setAttribute("aria-label", "Dismiss");
@@ -75,6 +76,18 @@ function remove(id: number) {
   cards.delete(id);
 }
 
+/** Connector logos go on the mascot badge; built-in glyphs stay inline. */
+const glyphOnly = (icon: string | null) => (icon?.startsWith("app:") ? null : icon);
+
+/** A connector's logo pops onto the mascot while a step uses it. */
+function setBadge(card: HTMLElement, icon: string | null) {
+  const badge = card.querySelector<HTMLElement>(".app-badge")!;
+  const key = icon?.startsWith("app:") ? icon : "";
+  if (badge.dataset.key === key) return;
+  badge.dataset.key = key;
+  badge.replaceChildren(...(key ? [toolIcon(key)] : []));
+}
+
 function setStatus(card: HTMLElement, status: Status): boolean {
   if (card.dataset.status === status) return false;
   card.dataset.status = status;
@@ -90,7 +103,8 @@ function render(t: TaskEvent) {
   const card = getCard(t.id);
   card.querySelector(".title")!.textContent = t.title;
   const sub = t.status === "queued" ? "Waiting for a free slot" : t.status === "running" ? (t.step ?? "Working") : (t.summary ?? "");
-  card.querySelector(".sub")!.textContent = sub;
+  setLine(card.querySelector<HTMLElement>(".sub")!, t.status === "running" ? glyphOnly(t.icon) : null, sub);
+  setBadge(card, t.status === "running" ? t.icon : null);
   if (!setStatus(card, t.status)) return; // keep animations smooth between step updates
 
   const actions = card.querySelector(".actions")!;
@@ -139,7 +153,8 @@ function renderApproval(a: Approval) {
   card.querySelector(".title")!.textContent = titles.get(a.task_id) ?? a.title;
   setStatus(card, "needs_you");
   clearTimeout(timers.get(a.task_id));
-  card.querySelector(".sub")!.textContent = a.summary;
+  setLine(card.querySelector<HTMLElement>(".sub")!, glyphOnly(a.icon), a.summary);
+  setBadge(card, a.icon);
   card.querySelector(".extra")!.replaceChildren(el("pre", "detail", a.detail));
   const answer = (allow: boolean) => {
     invoke("answer_approval", { approvalId: a.approval_id, allow });

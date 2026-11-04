@@ -35,6 +35,8 @@ pub struct TaskEvent {
     status: &'static str, // queued | running | done | failed
     step: Option<String>,
     summary: Option<String>,
+    /// What the current step uses, for its logo: see `tool_icon`.
+    icon: Option<String>,
 }
 
 struct Job {
@@ -98,7 +100,7 @@ struct Inner {
 }
 
 fn emit(app: &AppHandle, id: u64, title: &str, status: &'static str, step: Option<String>, summary: Option<String>) {
-    let _ = app.emit("otto://task", TaskEvent { id, title: title.to_string(), status, step, summary });
+    let _ = app.emit("otto://task", TaskEvent { id, title: title.to_string(), status, step, summary, icon: None });
 }
 
 impl Tasks {
@@ -269,8 +271,14 @@ fn run(app: &AppHandle, job: &Job) {
                     if c["type"] == "tool_use" {
                         let name = c["name"].as_str().unwrap_or("tool");
                         gate.observe(job.id, c["id"].as_str().unwrap_or(""), name, &c["input"]);
-                        let step = describe_tool(name, &c["input"]);
-                        emit(app, job.id, &job.title, "running", Some(step), None);
+                        let _ = app.emit("otto://task", TaskEvent {
+                            id: job.id,
+                            title: job.title.clone(),
+                            status: "running",
+                            step: Some(describe_tool(name, &c["input"])),
+                            summary: None,
+                            icon: Some(tool_icon(name, &c["input"])),
+                        });
                     }
                 }
             }
@@ -496,6 +504,29 @@ pub(crate) fn preview(text: &str) -> String {
         .last()
         .unwrap_or("");
     last.replace("**", "").replace('`', "").split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// A short key the UI turns into a logo or glyph: "file", "search", "web",
+/// "terminal", "mac", "memory", "plan", or "app:<server>" for connectors and
+/// plugins ("app:gmail", "app:googlecalendar", "app:claude-mem").
+pub(crate) fn tool_icon(name: &str, input: &Value) -> String {
+    match name {
+        "Write" | "Edit" | "MultiEdit" | "Read" | "NotebookEdit" => "file".into(),
+        "Glob" | "Grep" | "LS" | "mcp__otto__find_files" => "search".into(),
+        "WebSearch" | "WebFetch" => "web".into(),
+        "TodoWrite" => "plan".into(),
+        "Bash" if input["command"].as_str().is_some_and(|c| c.contains("osascript")) => "mac".into(),
+        "Bash" => "terminal".into(),
+        "mcp__otto__remember" => "memory".into(),
+        t if t.starts_with("mcp__") => {
+            let server = t.splitn(3, "__").nth(1).unwrap_or("");
+            let server = server.strip_prefix("claude_ai_").or(server.strip_prefix("plugin_")).unwrap_or(server);
+            // Plugin servers are "<plugin>_<server>"; the plugin name is the app.
+            let app = if t.starts_with("mcp__plugin_") { server.split('_').next().unwrap_or(server) } else { server };
+            format!("app:{}", app.to_ascii_lowercase().replace(['_', ' '], ""))
+        }
+        _ => "tool".into(),
+    }
 }
 
 pub(crate) fn describe_tool(name: &str, input: &Value) -> String {

@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { renderMarkdown, withoutRecap } from "./markdown";
+import { toolIcon } from "./icons";
 
 type Status = "done" | "failed" | "incomplete" | "running";
 type Entry = { folder: string; created_unix: number; transcript: string; status: Status; preview: string };
@@ -9,7 +10,7 @@ type Approval = { decision: string; by: string } | null;
 type Item =
   | { kind: "said"; text: string; unix: number; follow_up: boolean }
   | { kind: "note"; text: string; ts: string }
-  | { kind: "tool"; tool: string; label: string; detail: string; approval: Approval; output: string | null; error: boolean; ts: string }
+  | { kind: "tool"; tool: string; label: string; icon?: string; detail: string; approval: Approval; output: string | null; error: boolean; ts: string }
   | { kind: "result"; ok: boolean; text: string; duration_ms: number | null };
 type Detail = {
   transcript: string;
@@ -136,7 +137,10 @@ function renderItem(it: Item, start: number): HTMLLIElement {
   if (it.kind === "tool") {
     const body = el("div", "body");
     const head = el("div", "head");
-    head.append(el("span", "label", it.label), approvalBadge(it.approval) ?? el("span"));
+    const label = el("span", "label");
+    if (it.icon) label.append(toolIcon(it.icon));
+    label.append(it.label);
+    head.append(label, approvalBadge(it.approval) ?? el("span"));
     const at = Date.parse(it.ts);
     if (start && at) head.append(el("span", "at", `+${seconds(at - start)}`));
     body.append(head);
