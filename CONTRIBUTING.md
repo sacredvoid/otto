@@ -65,3 +65,8 @@ If you find a way to get something past the permission gate, please don't open a
 ## Releases
 
 Maintainers tag a version (`git tag v0.3.2 && git push origin v0.3.2`), then bump `version` in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` to the next patch so local builds never look older than the latest release. CI builds the macOS DMG and the Windows installer and publishes both in one GitHub Release, and installed copies show "Update available" in the menu bar within a day.
+
+## Maintainers
+
+- Samanvya Tripathi ([@sacredvoid](https://github.com/sacredvoid))
+- Santosh Oruganty ([@santhoshraghu](https://github.com/santhoshraghu))
