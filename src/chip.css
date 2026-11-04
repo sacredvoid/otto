@@ -1,0 +1,85 @@
+:root {
+  --ink: #1c2622;
+  --muted: #5b6b65;
+  --line: #e3ebe7;
+  --teal-ink: #24594a;
+  --blue: #2b5677;
+}
+
+html,
+body {
+  margin: 0;
+  background: transparent;
+  font-family: "Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+/* Pinned bottom-right and sized by content, so the reported size never depends on the window. */
+#root {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: max-content;
+  padding: 8px;
+}
+
+.chip,
+.panel {
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgba(28, 38, 34, 0.12);
+}
+.panel { display: none; }
+#root:hover .chip { display: none; }
+#root:hover .panel { display: flex; }
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 14px 0 8px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.chip svg { width: 26px; height: 26px; flex: none; display: block; }
+.needs { color: var(--blue); }
+.sep { width: 1px; height: 14px; background: var(--line); }
+
+.panel {
+  flex-direction: column;
+  min-width: 280px;
+  max-width: 420px;
+  padding: 6px 0;
+  border-radius: 16px;
+}
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 18px;
+}
+.row.needs-you { margin: 0 6px; padding: 12px; border-radius: 10px; background: #f0f6fb; }
+.row .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.title { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { font-size: 12px; color: var(--teal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.needs-you .sub { color: var(--blue); }
+.bar { height: 3px; border-radius: 2px; background: #edf2ef; overflow: hidden; }
+.bar::after {
+  content: "";
+  display: block;
+  width: 40%;
+  height: 3px;
+  border-radius: 2px;
+  background: #8cc9b2;
+  animation: slide 1.6s ease-in-out infinite;
+}
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) {
+  .bar::after { animation: none; width: 60%; }
+}

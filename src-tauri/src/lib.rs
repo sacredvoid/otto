@@ -3,6 +3,7 @@ mod gate;
 mod overlay;
 mod stt;
 mod tasks;
+mod tray;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -151,6 +152,11 @@ fn set_toasts_height(app: AppHandle, height: f64) {
     overlay::set_toasts_height(&app, height);
 }
 
+#[tauri::command]
+fn set_chip_size(app: AppHandle, width: f64, height: f64) {
+    overlay::set_chip_size(&app, width, height);
+}
+
 fn hide_later(app: &AppHandle) {
     let generation = app.state::<Otto>().generation.load(Ordering::SeqCst);
     let app = app.clone();
@@ -167,7 +173,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(Otto::default())
         .manage(tasks::Tasks::default())
-        .invoke_handler(tauri::generate_handler![task_details, open_task_file, show_task_folder, cancel_task, answer_approval, set_toasts_height])
+        .invoke_handler(tauri::generate_handler![task_details, open_task_file, show_task_folder, cancel_task, answer_approval, set_toasts_height, set_chip_size])
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcuts([HOTKEY])
@@ -183,6 +189,8 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             overlay::place(app.handle());
             overlay::place_toasts(app.handle());
+            overlay::place_chip(app.handle());
+            tray::start(app.handle())?;
 
             let asks = app.handle().clone();
             let audit = dirs::home_dir().unwrap_or_default().join("Otto/audit.jsonl");

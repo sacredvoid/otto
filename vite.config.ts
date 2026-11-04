@@ -13,7 +13,7 @@ export default defineConfig(() => ({
   // Two pages: the listening pill (index.html) and the task cards (toasts.html).
   build: {
     rollupOptions: {
-      input: { overlay: "index.html", toasts: "toasts.html" },
+      input: { overlay: "index.html", toasts: "toasts.html", chip: "chip.html" },
     },
   },
   // 2. tauri expects a fixed port, fail if that port is not available
