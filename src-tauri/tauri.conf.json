@@ -67,6 +67,18 @@
         "resizable": false,
         "maximizable": false,
         "visible": false
+      },
+      {
+        "label": "history",
+        "title": "Otto History",
+        "url": "history.html",
+        "width": 900,
+        "height": 620,
+        "minWidth": 640,
+        "minHeight": 400,
+        "center": true,
+        "resizable": true,
+        "visible": false
       }
     ],
     "security": {
