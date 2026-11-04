@@ -53,22 +53,25 @@
 
       <section data-step="3" hidden>
         <h1 tabindex="-1">Pick your AI</h1>
-        <p class="muted">Otto hands each request to an AI assistant on this Mac.</p>
+        <p class="muted">Otto hands each request to an AI assistant on this <span data-pc="PC">Mac</span>.</p>
         <div id="ais" class="ais" role="radiogroup" aria-label="AI assistant"></div>
         <div id="account" class="account" aria-live="polite"></div>
       </section>
 
       <section data-step="4" hidden>
         <h1 tabindex="-1">What Otto can use</h1>
-        <p class="muted">These are on by default. Turn off anything you don't want Otto to touch. Change it later: menu bar, Open Otto, Setup.</p>
+        <p class="muted">These are on by default. Turn off anything you don't want Otto to touch. Change it later: <span data-pc="system tray">menu bar</span>, Open Otto, Setup.</p>
         <div id="caps" class="caps"></div>
       </section>
 
       <section data-step="5" hidden class="center">
         <h1 tabindex="-1">Try it</h1>
         <p class="lead">Hold the keys and say "hi Otto". Let go when you're done.</p>
-        <div class="keys" aria-label="Control, Option, Space">
+        <div class="keys mac-only" aria-label="Control, Option, Space">
           <kbd>&#8963;</kbd><kbd>&#8997;</kbd><kbd class="wide">space</kbd>
+        </div>
+        <div class="keys win-only" aria-label="Control, Alt, Space">
+          <kbd class="wide">Ctrl</kbd><kbd class="wide">Alt</kbd><kbd class="wide">space</kbd>
         </div>
         <p id="heard" class="heard" role="status" hidden></p>
         <p class="muted small">You can skip this and try it later.</p>

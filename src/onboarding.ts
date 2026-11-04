@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { isWindows } from "./platform";
 
 type Info = { model_ready: boolean; folders: string[]; disabled: string[]; plugins: string[]; ask_memory: boolean };
 type Server = { key: string; name: string; tools: string[] };
@@ -76,9 +77,11 @@ function renderFolders() {
 
 const BUILT_IN: Cap[] = [
   { name: "Read and write files", what: "Reads the folders you picked. Writes only inside each task's own folder.", asks: "Always on", off: null },
-  { name: "Run commands and control Mac apps", what: "Shell commands, AppleScript, Shortcuts and screenshots.", asks: "Asks every time", off: ["Bash"] },
+  isWindows
+    ? { name: "Run commands and control apps", what: "PowerShell, scheduled tasks and screenshots.", asks: "Asks every time", off: ["Bash"] }
+    : { name: "Run commands and control Mac apps", what: "Shell commands, AppleScript, Shortcuts and screenshots.", asks: "Asks every time", off: ["Bash"] },
   { name: "Web search and web pages", what: "Looks things up online.", asks: "Asks once a task has read your files", off: ["WebSearch", "WebFetch"] },
-  { name: "Spotlight search", what: "Finds files fast, only inside your picked folders.", asks: "Automatic", off: ["mcp__otto__find_files"] },
+  { name: isWindows ? "Windows Search" : "Spotlight search", what: "Finds files fast, only inside your picked folders.", asks: "Automatic", off: ["mcp__otto__find_files"] },
   { name: "Memory", what: "Saves short notes about you to ~/Otto/memory.md.", asks: "Automatic", off: ["mcp__otto__remember"], askable: true },
 ];
 
@@ -182,10 +185,12 @@ function loadConnectors() {
     .finally(renderCaps);
 }
 
-const WHERE =
-  "Otto has its own sign-in, separate from Claude Code in your Terminal. The token is saved in your Mac's Keychain " +
-  '(as "Claude Code-credentials" plus a short code), is used only for Otto\'s tasks, and only goes to Anthropic. ' +
-  "Signing in or out here doesn't touch your Terminal login.";
+const WHERE = isWindows
+  ? "Otto has its own sign-in, separate from Claude Code in your terminal. The token is saved in Otto's own Claude Code " +
+    "profile (~/Otto/claude), is used only for Otto's tasks, and only goes to Anthropic. Signing in or out here doesn't touch your terminal login."
+  : "Otto has its own sign-in, separate from Claude Code in your Terminal. The token is saved in your Mac's Keychain " +
+    '(as "Claude Code-credentials" plus a short code), is used only for Otto\'s tasks, and only goes to Anthropic. ' +
+    "Signing in or out here doesn't touch your Terminal login.";
 
 /** "Sign in" runs the CLI's own login. The token stays in the Keychain, owned by Claude Code. */
 async function renderAccount(waiting = false, error = "") {

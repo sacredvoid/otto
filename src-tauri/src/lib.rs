@@ -3,6 +3,7 @@ mod gate;
 mod history;
 mod onboarding;
 mod overlay;
+mod platform;
 mod power;
 mod stt;
 mod tasks;
@@ -149,8 +150,8 @@ fn task_dir(tasks: &tasks::Tasks, id: u64) -> Result<std::path::PathBuf, String>
     tasks.dir(id).ok_or_else(|| "unknown task".to_string())
 }
 
-pub(crate) fn open(args: &[&std::ffi::OsStr]) -> Result<(), String> {
-    std::process::Command::new("open").args(args).spawn().map(|_| ()).map_err(|e| e.to_string())
+pub(crate) fn open(target: &std::ffi::OsStr) -> Result<(), String> {
+    platform::open(target)
 }
 
 #[tauri::command]
@@ -161,13 +162,13 @@ fn task_details(tasks: tauri::State<tasks::Tasks>, id: u64) -> Result<tasks::Det
 #[tauri::command]
 fn open_task_file(tasks: tauri::State<tasks::Tasks>, id: u64, name: String) -> Result<(), String> {
     let file = tasks::task_file(&task_dir(&tasks, id)?, &name).ok_or("not a file in this task")?;
-    open(&[file.as_os_str()])
+    open(file.as_os_str())
 }
 
-/// Opens the task's folder as a Finder window.
+/// Opens the task's folder in Finder or Explorer.
 #[tauri::command]
 fn show_task_folder(tasks: tauri::State<tasks::Tasks>, id: u64) -> Result<(), String> {
-    open(&[task_dir(&tasks, id)?.as_os_str()])
+    open(task_dir(&tasks, id)?.as_os_str())
 }
 
 #[tauri::command]
@@ -203,7 +204,18 @@ fn hide_later(app: &AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Windows happily starts a second copy when Otto is opened again; show the
+    // running one instead. (macOS does this itself and sends Reopen, below.)
+    #[cfg(windows)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        if onboarding::is_onboarded() {
+            history::show(app, "home");
+        } else {
+            onboarding::show_onboarding(app);
+        }
+    }));
+    builder
         .manage(Otto::default())
         .manage(tasks::Tasks::default())
         .invoke_handler(tauri::generate_handler![task_details, open_task_file, show_task_folder, cancel_task, answer_approval, set_toasts_height, set_glass,
@@ -274,20 +286,20 @@ pub fn run() {
                     }
                 });
             }
-            println!("[otto] hold Ctrl+Option+Space to talk");
+            println!("[otto] hold {} to talk", platform::HOTKEY_LABEL);
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error while building Otto")
-        .run(|app, event| {
+        .run(|_app, _event| {
             // No Dock icon and the menu bar icon can hide behind the notch, so
             // opening Otto.app again shows a window instead of doing nothing.
             #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Reopen { .. } = event {
+            if let tauri::RunEvent::Reopen { .. } = _event {
                 if onboarding::is_onboarded() {
-                    history::show(app, "home");
+                    history::show(_app, "home");
                 } else {
-                    onboarding::show_onboarding(app);
+                    onboarding::show_onboarding(_app);
                 }
             }
         });

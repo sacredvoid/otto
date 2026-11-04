@@ -20,6 +20,8 @@ pub fn place(app: &AppHandle) {
     let _ = win.set_ignore_cursor_events(true);
     #[cfg(target_os = "macos")]
     mac::make_panel(&win);
+    #[cfg(windows)]
+    let _ = win.set_focusable(false);
 }
 
 const TOAST_WIDTH: f64 = 380.0;
@@ -40,28 +42,25 @@ pub fn place_toasts(app: &AppHandle) {
     }
     #[cfg(target_os = "macos")]
     mac::make_panel(&win);
+    // Takes clicks (Allow, Open) but never the keyboard, like the Mac panel.
+    #[cfg(windows)]
+    let _ = win.set_focusable(false);
 }
 
 /// The webview reports its content height; 0 means no cards, so hide.
 pub fn set_toasts_height(app: &AppHandle, height: f64) {
     let Some(win) = app.get_webview_window("toasts") else { return };
     if !(height >= 1.0) {
-        let _ = win.hide();
-        return;
+        return hide_window(&win);
     }
     let _ = win.set_size(tauri::LogicalSize::new(TOAST_WIDTH, height.min(TOAST_MAX_HEIGHT)));
-    #[cfg(target_os = "macos")]
-    {
-        let w = win.clone();
-        let _ = app.run_on_main_thread(move || mac::order_front(&w));
-    }
-    #[cfg(not(target_os = "macos"))]
-    let _ = win.show();
+    show_window(app, win);
 }
 
 /// One `.glass` element in a webview: its box in CSS px (= points), corner
 /// radius and current opacity.
 #[derive(serde::Deserialize, Clone, Debug)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))] // native glass is macOS only
 pub struct GlassRect {
     x: f64,
     y: f64,
@@ -197,21 +196,57 @@ mod mac {
 
 /// Shows the pill WITHOUT activating Otto, so keyboard focus stays in the
 /// user's app.
-#[cfg(target_os = "macos")]
-pub fn show(app: &AppHandle) {
-    let Some(win) = window(app) else { return };
-    let _ = app.run_on_main_thread(move || mac::order_front(&win));
-}
-
-#[cfg(not(target_os = "macos"))]
 pub fn show(app: &AppHandle) {
     if let Some(win) = window(app) {
-        let _ = win.show();
+        show_window(app, win);
     }
 }
 
 pub fn hide(app: &AppHandle) {
     if let Some(win) = window(app) {
-        let _ = win.hide();
+        hide_window(&win);
+    }
+}
+
+/// Brings an overlay window up without taking focus from the user's app.
+fn show_window(app: &AppHandle, win: WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    let _ = app.run_on_main_thread(move || mac::order_front(&win));
+    #[cfg(windows)]
+    let _ = app.run_on_main_thread(move || win32::show(&win));
+    #[cfg(not(any(target_os = "macos", windows)))]
+    let _ = (app, win.show());
+}
+
+fn hide_window(win: &WebviewWindow) {
+    // Shown with a raw ShowWindow on Windows, so hidden the same way.
+    #[cfg(windows)]
+    win32::hide(win);
+    #[cfg(not(windows))]
+    let _ = win.hide();
+}
+
+/// Tauri's show() activates the window on Windows, which would pull focus out
+/// of whatever the user is typing in. ShowWindow(SW_SHOWNOACTIVATE) doesn't.
+#[cfg(windows)]
+mod win32 {
+    use tauri::WebviewWindow;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        HWND_TOPMOST, SW_HIDE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowPos, ShowWindow,
+    };
+
+    pub fn show(win: &WebviewWindow) {
+        let Ok(hwnd) = win.hwnd() else { return };
+        let h = hwnd.0 as _;
+        unsafe {
+            ShowWindow(h, SW_SHOWNOACTIVATE);
+            SetWindowPos(h, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+    }
+
+    pub fn hide(win: &WebviewWindow) {
+        if let Ok(hwnd) = win.hwnd() {
+            unsafe { ShowWindow(hwnd.0 as _, SW_HIDE) };
+        }
     }
 }

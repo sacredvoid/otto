@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { renderMarkdown, withoutRecap } from "./markdown";
 import { setLine, toolIcon } from "./icons";
 import { trackGlass } from "./glass";
+import { FOLDER_APP } from "./platform";
 
 type Status = "queued" | "running" | "done" | "failed" | "needs_you";
 type TaskEvent = { id: number; title: string; status: Exclude<Status, "needs_you">; step: string | null; summary: string | null; icon: string | null };
@@ -212,7 +213,7 @@ function render(t: TaskEvent) {
   if (t.status === "done") {
     actions.append(
       button("Open", "primary", () => toggleDetails(t.id)),
-      button("Show in Finder", "link", () => invoke("show_task_folder", { id: t.id })),
+      button(`Show in ${FOLDER_APP}`, "link", () => invoke("show_task_folder", { id: t.id })),
     );
     untuck(t.id);
     armDismiss(t.id);
@@ -222,7 +223,7 @@ function render(t: TaskEvent) {
       card.dataset.cancelled = "1";
       return armDismiss(t.id, CANCELLED_DISMISS_MS);
     }
-    actions.append(button("Show in Finder", "link", () => invoke("show_task_folder", { id: t.id })));
+    actions.append(button(`Show in ${FOLDER_APP}`, "link", () => invoke("show_task_folder", { id: t.id })));
   } else {
     actions.append(cancelButton(t.id));
     // A new task goes straight into the island; hover it for the card.

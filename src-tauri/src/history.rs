@@ -25,7 +25,7 @@ pub fn show(app: &AppHandle, view: &'static str) {
 pub fn open_tasks_folder() -> Result<(), String> {
     let dir = dirs::home_dir().ok_or("no home folder")?.join("Otto/tasks");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    crate::open(&[dir.as_os_str()])
+    crate::open(dir.as_os_str())
 }
 
 #[tauri::command]
@@ -279,12 +279,12 @@ pub async fn history_detail(tasks: tauri::State<'_, tasks::Tasks>, folder: Strin
 #[tauri::command]
 pub fn open_history_file(folder: String, name: String) -> Result<(), String> {
     let file = tasks::task_file(&dir_of(&folder)?, &name).ok_or("not a file in this task")?;
-    crate::open(&[file.as_os_str()])
+    crate::open(file.as_os_str())
 }
 
 #[tauri::command]
 pub fn show_history_folder(folder: String) -> Result<(), String> {
-    crate::open(&[dir_of(&folder)?.as_os_str()])
+    crate::open(dir_of(&folder)?.as_os_str())
 }
 
 #[cfg(test)]

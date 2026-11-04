@@ -1,26 +1,39 @@
-# Every push to main and every PR: tests, then a DMG kept as a workflow artifact.
-# A pushed tag like v0.2.0 also publishes that DMG as a GitHub Release.
+# Every push to main and every PR: tests, then a macOS DMG and a Windows
+# installer kept as workflow artifacts. A pushed tag like v0.5.0 also
+# publishes both as one GitHub Release.
 name: build
 
 on:
   push:
     branches: [main]
     tags: ["v*"]
-    # Docs-only pushes don't need a 10-minute macOS build.
+    # Docs-only pushes don't need the 10-minute builds.
     paths-ignore: ["**.md", "docs/**"]
   pull_request:
     paths-ignore: ["**.md", "docs/**"]
+  workflow_dispatch:
 
 permissions:
-  contents: write # only used by the release step on tags
+  contents: write # only used by the release job on tags
 
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  macos:
-    runs-on: macos-14 # Apple Silicon, matches the aarch64 DMG
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14 # Apple Silicon, matches the aarch64 DMG
+            bundle: src-tauri/target/release/bundle/dmg/*.dmg
+          - os: windows-latest
+            bundle: src-tauri/target/release/bundle/nsis/*.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -41,6 +54,9 @@ jobs:
           path: models
           key: whisper-ggml-base.en
 
+      - name: Fetch speech model
+        run: sh scripts/fetch-model.sh
+
       - run: npm ci
 
       # The app compares its own version with the latest release, so a tag sets it.
@@ -56,24 +72,39 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
-      - name: Build Otto.app and DMG
+      - name: Build the app and installer
         run: npm run tauri build
 
-      - name: Keep the DMG with this run
+      - name: Keep the installer with this run
         uses: actions/upload-artifact@v4
         with:
-          name: Otto-${{ github.sha }}
-          path: src-tauri/target/release/bundle/dmg/*.dmg
+          name: Otto-${{ matrix.os }}-${{ github.sha }}
+          path: ${{ matrix.bundle }}
           retention-days: 14
 
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          dmg=$(ls src-tauri/target/release/bundle/dmg/*.dmg)
-          cp "$dmg" "Otto-${TAG#v}-AppleSilicon.dmg"
-          gh release create "$TAG" "Otto-${TAG#v}-AppleSilicon.dmg" \
-            --title "Otto ${TAG#v}" --generate-notes \
-            --notes "Apple Silicon, macOS 13+. Needs Claude Code installed (you sign in from the setup window). Open the DMG, drag Otto to Applications, then on first launch click Done (not Move to Trash) and use System Settings > Privacy & Security > Open Anyway, or run: xattr -dr com.apple.quarantine /Applications/Otto.app (this build isn't notarized yet)."
+          v="${TAG#v}"
+          cp out/Otto-macos-14-*/*.dmg "Otto-$v-AppleSilicon.dmg"
+          cp out/Otto-windows-latest-*/*.exe "Otto-$v-Windows-Setup.exe"
+          cat > notes.md <<'NOTES'
+          **Mac** (Apple Silicon, macOS 13+): open the DMG and drag Otto to Applications. On first launch click Done (not Move to Trash), then System Settings > Privacy & Security > Open Anyway, or run `xattr -dr com.apple.quarantine /Applications/Otto.app` (not notarized yet).
+
+          **Windows** 10/11 x64 (experimental): run the Setup exe. SmartScreen may warn because it isn't signed yet: click More info, then Run anyway. Also needs Git for Windows.
+
+          Both need Claude Code installed; you sign in from Otto's setup window.
+          NOTES
+          gh release create "$TAG" "Otto-$v-AppleSilicon.dmg" "Otto-$v-Windows-Setup.exe" \
+            --repo "$GITHUB_REPOSITORY" --title "Otto $v" --generate-notes --notes-file notes.md

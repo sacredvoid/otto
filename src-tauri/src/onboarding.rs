@@ -2,8 +2,7 @@
 
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use serde::Serialize;
@@ -75,11 +74,7 @@ pub struct Info {
 #[tauri::command]
 pub fn onboarding_info() -> Info {
     let home = home();
-    let mut folders: Vec<String> = ["Documents", "Desktop", "Downloads"]
-        .iter()
-        .filter(|n| home.join(n).is_dir())
-        .map(|n| format!("~/{n}"))
-        .collect();
+    let mut folders = crate::tasks::standard_dirs();
     let mut extra: Vec<String> = std::fs::read_dir(&home)
         .into_iter()
         .flatten()
@@ -116,18 +111,9 @@ pub async fn onboarding_detect() -> Detected {
     }
 }
 
-/// Same lookup order as `tasks::claude_bin`: login shell, then the usual dirs.
+/// Same lookup as `tasks::claude_bin`.
 fn cli_exists(name: &str) -> bool {
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
-    if let Ok(out) = Command::new(shell).args(["-lc", &format!("command -v {name}")]).output() {
-        let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
-        if p.starts_with('/') && Path::new(&p).is_file() {
-            return true;
-        }
-    }
-    [home().join(".local/bin"), "/opt/homebrew/bin".into(), "/usr/local/bin".into()]
-        .iter()
-        .any(|d| d.join(name).is_file())
+    crate::platform::find_cli(name).is_some()
 }
 
 fn ollama_up() -> bool {
@@ -169,10 +155,13 @@ pub fn request_mic() {
 #[tauri::command]
 pub fn open_settings(pane: String) {
     let url = match pane.as_str() {
+        #[cfg(target_os = "macos")]
         "microphone" => "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
+        #[cfg(not(target_os = "macos"))]
+        "microphone" => "ms-settings:privacy-microphone",
         _ => return,
     };
-    let _ = Command::new("open").arg(url).spawn();
+    let _ = crate::platform::open(url.as_ref());
 }
 
 /// A connector or plugin server Claude Code loaded for this account.

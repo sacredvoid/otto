@@ -1,3 +1,4 @@
+import "./platform";
 import { listen } from "@tauri-apps/api/event";
 import { trackGlass } from "./glass";
 

@@ -1,17 +1,18 @@
 <h1 align="center"><img src="docs/otto.svg" width="44" align="center" alt=""> Otto</h1>
 
-<p align="center"><b>Your always-on assistant for the busywork on your Mac.</b></p>
+<p align="center"><b>Your always-on assistant for the busywork on your Mac (and now Windows).</b></p>
 <p align="center">Wispr types what you say. Otto does it.</p>
 
 <p align="center">
   <a href="https://github.com/sacredvoid/otto/releases/latest"><img alt="Download for macOS" src="https://img.shields.io/badge/Download-macOS%20(Apple%20Silicon)-24594a?style=for-the-badge&logo=apple&logoColor=white"></a>
+  <a href="https://github.com/sacredvoid/otto/releases/latest"><img alt="Download for Windows" src="https://img.shields.io/badge/Download-Windows%20(experimental)-2b5677?style=for-the-badge&logo=windows&logoColor=white"></a>
 </p>
 
 <p align="center">
   <img src="docs/hero.svg" width="880" alt="Otto in five steps: hold the hotkey and talk, Otto transcribes it, works in the background, asks before sending, then shows the result.">
 </p>
 
-Hold **Ctrl + Option + Space**, say what you need, let go, and keep working. Otto drips out of the notch while it listens, hands the task to Claude Code, shows progress in a small glass island, and asks before anything risky.
+Hold **Ctrl + Option + Space** (**Ctrl + Alt + Space** on Windows), say what you need, let go, and keep working. Otto drips out of the notch while it listens, hands the task to Claude Code, shows progress in a small glass island, and asks before anything risky.
 
 ## What it does
 
@@ -54,7 +55,7 @@ Say these out loud. Anything that sends, changes, or runs something waits for yo
 - "Find the PDF invoice from Northwind I downloaded last week and rename it with the date."
 - "Turn my notes from this morning into a one-page brief."
 
-**Apple Shortcuts**
+**Apple Shortcuts** (on Windows: scheduled tasks and desktop shortcuts)
 - "Run my Morning Briefing shortcut."
 - "Make me a shortcut that copies the current Safari tab's link as a Markdown link."
 - "Build a shortcut that starts a 25 minute focus timer and turns on Do Not Disturb."
@@ -84,6 +85,8 @@ Otto has no model of its own. Each request runs as a `claude -p` task in restric
 
 ## Install
 
+### Mac
+
 1. Install [Claude Code](https://docs.claude.com/claude-code). You sign in from Otto's setup window, and that login stays separate from your Terminal one.
 2. [Download Otto](https://github.com/sacredvoid/otto/releases/latest), open the DMG, and drag Otto to Applications.
 3. Open Otto. macOS blocks it the first time because it isn't notarized yet. Click **Done** (not Move to Trash), then go to System Settings, Privacy & Security, scroll down, and click **Open Anyway**. Or run this once in Terminal:
@@ -92,9 +95,17 @@ Otto has no model of its own. Each request runs as a `claude -p` task in restric
    ```
 4. The setup window walks you through signing in to Claude, microphone access, which folders Otto may read, and which of your account's connectors it may use.
 
+### Windows (experimental)
+
+1. Install [Git for Windows](https://git-scm.com/download/win) (Claude Code needs its Git Bash), then [Claude Code](https://docs.claude.com/claude-code). The native installer is best: `irm https://claude.ai/install.ps1 | iex` in PowerShell.
+2. [Download](https://github.com/sacredvoid/otto/releases/latest) `Otto-<version>-Windows-Setup.exe` and run it. It installs for your user only, no admin needed. SmartScreen may warn because the installer isn't signed yet: click **More info**, then **Run anyway**.
+3. Otto appears in the system tray (you may need the **^** overflow arrow). The setup window walks you through the same steps as on a Mac.
+
+What's different on Windows: there's no notch, so the island drops from the top of the screen, and the cards are solid instead of glass. Otto drives apps with PowerShell instead of AppleScript, uses Windows Search to find files, and sets up automations as Scheduled Tasks instead of Shortcuts. It's new, so please [file an issue](https://github.com/sacredvoid/otto/issues) when something's off.
+
 The speech model ships inside the app, so there's nothing else to download.
 
-**Updates:** Otto checks GitHub once a day. When a new version is out, the menu bar menu shows *Update available*, which opens the download page. Turn it off with `"check_updates": false` in `~/Otto/config.json`.
+**Updates:** Otto checks GitHub once a day. When a new version is out, the menu bar (or tray) menu shows *Update available*, which opens the download page. Turn it off with `"check_updates": false` in `~/Otto/config.json`.
 
 <details>
 <summary>Build from source</summary>
@@ -107,6 +118,8 @@ npm install
 npm run tauri dev      # run it
 npm run tauri build    # make Otto.app and the DMG (fetches the speech model first)
 ```
+
+On Windows, also install the [Visual Studio C++ build tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/), CMake and LLVM (for the speech engine), and fetch the model yourself first: `sh scripts/fetch-model.sh` in Git Bash. `npm run tauri build` then makes an NSIS installer.
 </details>
 
 ## Follow-ups
@@ -143,6 +156,7 @@ src-tauri/src/
   onboarding.rs first-run setup
   overlay.rs    the notch island and cards windows, native glass
   power.rs      open at login, sleep and wake
+  platform.rs   the macOS / Windows differences in starting programs
 src/            each window as page + script + styles (pill, cards, setup, history)
 scripts/hero.py regenerates docs/hero.svg
 DESIGN.md       the design doc and build plan
@@ -156,7 +170,8 @@ DESIGN.md       the design doc and build plan
 - [x] Connectors, memory, Mac app control
 - [ ] Other AI backends: Codex CLI, Gemini CLI, OpenAI-compatible APIs, Ollama
 - [x] Downloadable DMG, built by CI; tagged versions become releases
-- [ ] Notarized build with auto-update
+- [x] Windows build (experimental)
+- [ ] Notarized and signed builds with auto-update
 
 ## Contributing
 
@@ -164,4 +179,4 @@ Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md
 
 ## Status
 
-Early preview. I use it daily, it has rough edges, and it only runs on Apple Silicon for now.
+Early preview. I use it daily, it has rough edges. On a Mac it needs Apple Silicon; the Windows build is new and experimental.

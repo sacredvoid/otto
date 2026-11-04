@@ -27,7 +27,7 @@ pub fn start(app: &AppHandle) {
 
 /// (version without "v", release page). None when offline or the answer is odd.
 fn latest() -> Option<(String, String)> {
-    let out = std::process::Command::new("/usr/bin/curl")
+    let out = crate::platform::curl()
         .args(["-fsSL", "-m", "15", "-H", "Accept: application/vnd.github+json", LATEST])
         .output()
         .ok()?;

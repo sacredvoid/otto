@@ -307,7 +307,7 @@ impl Gate {
             "ping" => Ok(json!({})),
             "tools/list" => Ok(json!({ "tools": [{
                 "name": "find_files",
-                "description": "Find files on the user's Mac with Spotlight, limited to the folders Otto may read. \
+                "description": "Find files on the user's computer with its search index (Spotlight or Windows Search), limited to the folders Otto may read. \
 Much faster than Grep or Glob across big folders. Matches file contents and names; set name_only to match names only. \
 Returns up to 50 paths, skipping dependency and build folders.",
                 "inputSchema": {
@@ -377,30 +377,128 @@ Returns up to 50 paths, skipping dependency and build folders.",
     }
 }
 
-const SKIP_DIRS: [&str; 9] =
-    ["/node_modules/", "/.venv/", "/venv/", "/site-packages/", "/target/", "/.git/", "/dist/", "/build/", "/Library/"];
+/// Folders never worth searching: dependencies, builds, app data.
+const SKIP_DIRS: [&str; 10] =
+    ["node_modules", ".venv", "venv", "site-packages", "target", ".git", "dist", "build", "Library", "AppData"];
+const FIND_LIMIT: usize = 50;
+const INDEX_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Spotlight search across the readable folders. No shell: the query is a plain argument.
-// ponytail: no timeout on mdfind; it answers from the index in well under a second.
+fn skipped(p: &Path) -> bool {
+    p.components().any(|c| matches!(c, Component::Normal(n) if SKIP_DIRS.iter().any(|s| n == *s)))
+}
+
+/// The system search index (Spotlight, Windows Search) across the readable
+/// folders, or a bounded walk of file names where the index has nothing.
 fn find_files(readable: &[PathBuf], query: &str, name_only: bool) -> Vec<String> {
-    let mut out = Vec::new();
-    for dir in readable {
-        let mut cmd = std::process::Command::new("mdfind");
-        cmd.arg("-onlyin").arg(dir);
-        if name_only {
-            cmd.arg("-name");
-        }
-        let Ok(o) = cmd.arg(query).output() else { continue };
-        out.extend(
-            String::from_utf8_lossy(&o.stdout)
-                .lines()
-                .filter(|p| !SKIP_DIRS.iter().any(|s| p.contains(s)))
-                .map(String::from),
-        );
-    }
+    let mut out: Vec<String> = readable
+        .iter()
+        .flat_map(|dir| indexed_search(dir, query, name_only).filter(|v| !v.is_empty()).unwrap_or_else(|| walk_names(dir, query)))
+        .filter(|p| !skipped(Path::new(p)))
+        .collect();
     out.sort();
     out.dedup();
-    out.truncate(50);
+    out.truncate(FIND_LIMIT);
+    out
+}
+
+/// Spotlight. No shell: the query is a plain argument.
+#[cfg(target_os = "macos")]
+fn indexed_search(dir: &Path, query: &str, name_only: bool) -> Option<Vec<String>> {
+    let mut cmd = crate::platform::command("mdfind");
+    cmd.arg("-onlyin").arg(dir);
+    if name_only {
+        cmd.arg("-name");
+    }
+    cmd.arg(query);
+    let out = output_within(cmd, INDEX_TIMEOUT)?;
+    Some(out.lines().map(String::from).collect())
+}
+
+/// Windows Search through its OLE DB provider. The query reaches PowerShell as
+/// an environment variable (never spliced into the script) and is reduced to
+/// letters, digits and a few separators before it goes into the index query.
+#[cfg(windows)]
+fn indexed_search(dir: &Path, query: &str, name_only: bool) -> Option<Vec<String>> {
+    const SCRIPT: &str = r#"$q = $env:OTTO_Q; $scope = $env:OTTO_SCOPE
+$c = New-Object -ComObject ADODB.Connection
+$c.Open("Provider=Search.CollatorDSO;Extended Properties='Application=Windows';")
+$match = if ($env:OTTO_NAME -eq '1') { "System.FileName LIKE '%$q%'" } else { "(System.FileName LIKE '%$q%' OR FREETEXT('$q'))" }
+$rs = $c.Execute("SELECT TOP 50 System.ItemPathDisplay FROM SYSTEMINDEX WHERE SCOPE='file:$scope' AND $match")
+while (-not $rs.EOF) { $rs.Fields.Item('System.ItemPathDisplay').Value; $rs.MoveNext() }"#;
+    let q = index_query(query)?;
+    let scope = dir.to_string_lossy().replace('\\', "/").replace('\'', "''");
+    let mut cmd = crate::platform::command("powershell.exe");
+    cmd.args(["-NoProfile", "-NonInteractive", "-Command", SCRIPT])
+        .env("OTTO_Q", q)
+        .env("OTTO_SCOPE", scope)
+        .env("OTTO_NAME", if name_only { "1" } else { "0" });
+    let out = output_within(cmd, INDEX_TIMEOUT)?;
+    Some(out.lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect())
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
+fn indexed_search(_dir: &Path, _query: &str, _name_only: bool) -> Option<Vec<String>> {
+    None
+}
+
+/// Words safe to put inside a quoted index query: letters, digits, space, - _ .
+#[cfg_attr(not(windows), allow(dead_code))]
+fn index_query(query: &str) -> Option<String> {
+    let q: String = query.chars().filter(|c| c.is_alphanumeric() || " -_.".contains(*c)).collect();
+    let q = q.split_whitespace().collect::<Vec<_>>().join(" ");
+    (!q.is_empty()).then_some(q)
+}
+
+/// Runs a search command, giving up after `limit` so a stuck index can't stall the task.
+fn output_within(mut cmd: std::process::Command, limit: Duration) -> Option<String> {
+    use std::process::Stdio;
+    let mut child = cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().ok()?;
+    let mut stdout = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut s = String::new();
+        let _ = stdout.read_to_string(&mut s);
+        s
+    });
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return status.success().then(|| reader.join().unwrap_or_default()),
+            Ok(None) if start.elapsed() < limit => std::thread::sleep(Duration::from_millis(50)),
+            _ => {
+                let _ = child.kill();
+                return None;
+            }
+        }
+    }
+}
+
+/// Fallback when there's no index: file names containing every query word,
+/// breadth first, skipping hidden and dependency folders.
+// ponytail: names only and capped at 20k entries; the index covers contents.
+fn walk_names(dir: &Path, query: &str) -> Vec<String> {
+    let words: Vec<String> = query.split_whitespace().map(str::to_lowercase).collect();
+    if words.is_empty() {
+        return Vec::new();
+    }
+    let mut queue = std::collections::VecDeque::from([dir.to_path_buf()]);
+    let (mut seen, mut out) = (0usize, Vec::new());
+    while let Some(d) = queue.pop_front() {
+        for entry in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            seen += 1;
+            if seen > 20_000 || out.len() >= FIND_LIMIT {
+                return out;
+            }
+            let name = entry.file_name().to_string_lossy().to_lowercase();
+            let Ok(kind) = entry.file_type() else { continue };
+            if kind.is_dir() {
+                if !name.starts_with('.') && !SKIP_DIRS.iter().any(|s| s.eq_ignore_ascii_case(&name)) {
+                    queue.push_back(entry.path());
+                }
+            } else if words.iter().all(|w| name.contains(w.as_str())) {
+                out.push(entry.path().to_string_lossy().into_owned());
+            }
+        }
+    }
     out
 }
 
@@ -472,7 +570,14 @@ fn classify(ctx: &TaskCtx, tool: &str, input: &Value) -> Verdict {
                     }
                 }
             }
-            let summary = if cmd.contains("osascript") { "Control a Mac app" } else { "Run a command" };
+            let lower = cmd.to_lowercase();
+            let summary = if lower.contains("osascript") {
+                "Control a Mac app"
+            } else if lower.contains("powershell") || lower.contains("pwsh") {
+                "Run a PowerShell command"
+            } else {
+                "Run a command"
+            };
             ask(summary, detail)
         }
         // ponytail: one OK covers every search in the task; queries stay visible in History.
@@ -489,9 +594,18 @@ fn classify(ctx: &TaskCtx, tool: &str, input: &Value) -> Verdict {
 // python -c). Real containment is the Claude Code Bash sandbox via --settings (planned).
 fn blocked_command(cmd: &str) -> Option<&'static str> {
     let c = cmd.to_lowercase();
-    if c.split(|ch: char| !ch.is_alphanumeric()).any(|w| w == "sudo") {
-        Some("admin (sudo) commands are never allowed")
-    } else if c.contains(".ssh") || c.contains("security find") || c.contains("security dump") {
+    let words: Vec<&str> = c.split(|ch: char| !ch.is_alphanumeric()).collect();
+    // sudo on a Mac; runas / Start-Process -Verb RunAs on Windows.
+    if words.iter().any(|w| matches!(*w, "sudo" | "runas")) {
+        Some("admin commands are never allowed")
+    } else if c.contains(".ssh")
+        || c.contains("security find")
+        || c.contains("security dump")
+        // Windows Credential Manager and its tools.
+        || words.iter().any(|w| matches!(*w, "cmdkey" | "vaultcmd"))
+        || c.contains("passwordvault")
+        || c.contains("get-storedcredential")
+    {
         Some("keys and passwords are off limits")
     } else {
         None
@@ -500,9 +614,14 @@ fn blocked_command(cmd: &str) -> Option<&'static str> {
 
 fn touches_network(cmd: &str) -> bool {
     let c = cmd.to_lowercase();
-    ["curl", "wget", "http://", "https://", "nc ", "ssh ", "scp ", "rsync ", "ftp", "git push", "npm publish"]
-        .iter()
-        .any(|k| c.contains(k))
+    [
+        "curl", "wget", "http://", "https://", "nc ", "ssh ", "scp ", "rsync ", "ftp", "git push", "npm publish",
+        // PowerShell and Windows downloaders.
+        "invoke-webrequest", "iwr ", "invoke-restmethod", "irm ", "start-bitstransfer", "bitsadmin", "certutil",
+        "net.webclient", "downloadstring", "downloadfile", "net use",
+    ]
+    .iter()
+    .any(|k| c.contains(k))
 }
 
 fn is_protected(p: &Path) -> bool {
@@ -557,7 +676,7 @@ fn ct_eq(a: &[u8], b: &[u8]) -> bool {
 
 fn random_hex(n: usize) -> Result<String, String> {
     let mut buf = vec![0u8; n];
-    File::open("/dev/urandom").and_then(|mut f| f.read_exact(&mut buf)).map_err(|e| format!("no randomness: {e}"))?;
+    getrandom::fill(&mut buf).map_err(|e| format!("no randomness: {e}"))?;
     Ok(buf.iter().map(|b| format!("{b:02x}")).collect())
 }
 
@@ -626,9 +745,13 @@ mod tests {
         assert!(is_ask(&classify(&c, "WebFetch", &json!({ "url": "https://x" }))));
 
         // A symlink inside the task folder pointing out is not "inside".
-        std::os::unix::fs::symlink("/etc", c.dir.join("link")).unwrap();
-        assert!(!resolves_inside(&c.dir.join("link"), &c.dir));
-        assert!(!resolves_inside(&c.dir.join("link/hosts"), &c.dir));
+        // (Windows symlinks need admin or developer mode, so Unix only.)
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink("/etc", c.dir.join("link")).unwrap();
+            assert!(!resolves_inside(&c.dir.join("link"), &c.dir));
+            assert!(!resolves_inside(&c.dir.join("link/hosts"), &c.dir));
+        }
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -711,6 +834,35 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "- Michael is my manager\n- Prefers short emails\n");
         assert_eq!(tool_label("mcp__claude_ai_Gmail__send_message"), "Gmail: send message");
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn windows_commands_are_screened() {
+        assert!(blocked_command("powershell -c \"Start-Process cmd -Verb RunAs\"").is_some());
+        assert!(blocked_command("runas /user:Administrator cmd").is_some());
+        assert!(blocked_command("cmdkey /list").is_some());
+        assert!(blocked_command("powershell Get-ChildItem").is_none());
+        assert!(touches_network("powershell -c \"Invoke-WebRequest example.com -OutFile x\""));
+        assert!(touches_network("powershell -c \"(New-Object Net.WebClient).DownloadString('x')\""));
+        assert!(!touches_network("powershell -c \"Get-Date\""));
+    }
+
+    #[test]
+    fn index_query_keeps_only_safe_characters() {
+        assert_eq!(index_query("q3 plan' OR 1=1; --").as_deref(), Some("q3 plan OR 11 --"));
+        assert_eq!(index_query("'%;"), None);
+    }
+
+    #[test]
+    fn walk_finds_names_and_skips_dependencies() {
+        let (c, root) = ctx();
+        std::fs::create_dir_all(c.dir.join("node_modules")).unwrap();
+        std::fs::write(c.dir.join("Q3 Planning.pdf"), "").unwrap();
+        std::fs::write(c.dir.join("node_modules/q3 planning.js"), "").unwrap();
+        let found = walk_names(&c.dir, "planning q3");
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].ends_with("Q3 Planning.pdf"));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

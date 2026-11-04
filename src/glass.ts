@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { isWindows } from "./platform";
 
 const px = (n: number) => Math.round(n * 2) / 2;
 
@@ -8,6 +9,7 @@ const px = (n: number) => Math.round(n * 2) / 2;
  * follows drops, tucks and fades.
  */
 export function trackGlass() {
+  if (isWindows) return; // no native glass there; the CSS draws a solid card instead
   let last = "";
   const measure = () => {
     const rects = [...document.querySelectorAll<HTMLElement>(".glass")].flatMap((e) => {

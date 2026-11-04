@@ -412,3 +412,25 @@ body {
 .pill-icon {
   display: flex;
 }
+
+/* Windows: no native glass behind the page, so draw near-solid cards, and the
+   island drops in its own color (there's no black notch to come out of). */
+html.windows .card,
+html.windows .pill {
+  background: rgba(252, 253, 253, 0.97);
+  border-color: var(--line);
+}
+html.windows .card[data-status="needs_you"] {
+  background: #f3f8fc;
+  border-color: #cfe0ef;
+}
+html.windows .pill {
+  animation-name: pill-in-plain;
+}
+@keyframes pill-in-plain {
+  0% { transform: translateY(-100%) scale(0.12, 0.7); opacity: 0.6; }
+  32% { transform: translateY(5%) scale(0.16, 1.18); opacity: 1; }
+  58% { transform: translateY(0) scale(1.05, 0.9); }
+  78% { transform: scale(0.985, 1.025); }
+  100% { transform: none; }
+}

@@ -10,16 +10,19 @@ pub struct Stt {
 
 const MODEL: &str = "ggml-base.en.bin";
 
-/// A model the user placed in Application Support wins (lets them swap in a bigger one);
-/// otherwise the one bundled in Otto.app/Contents/Resources/models.
+/// A model the user placed in the app's data folder wins (lets them swap in a bigger one);
+/// otherwise the one bundled with the app.
 pub fn default_model_path() -> PathBuf {
     let user = dirs::data_dir().unwrap_or_default().join("app.otto.desktop/models").join(MODEL);
     if user.is_file() {
         return user;
     }
-    let bundled = std::env::current_exe()
-        .ok()
-        .and_then(|exe| Some(exe.parent()?.parent()?.join("Resources/models").join(MODEL)));
+    // Bundled with the app: Otto.app/Contents/Resources on a Mac, next to Otto.exe on Windows.
+    #[cfg(target_os = "macos")]
+    let resources = |exe: &Path| Some(exe.parent()?.parent()?.join("Resources"));
+    #[cfg(not(target_os = "macos"))]
+    let resources = |exe: &Path| exe.parent().map(Path::to_path_buf);
+    let bundled = std::env::current_exe().ok().and_then(|exe| Some(resources(&exe)?.join("models").join(MODEL)));
     bundled.filter(|p| p.is_file()).unwrap_or(user)
 }
 
