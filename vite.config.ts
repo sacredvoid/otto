@@ -10,10 +10,16 @@ export default defineConfig(() => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
+  // Every window's page lives in src/ next to its script and styles; the build lands in dist/.
   // Pages: pill (index.html), task cards, corner chip, onboarding, history.
+  root: "src",
   build: {
+    outDir: "../dist",
+    emptyOutDir: true,
     rollupOptions: {
-      input: { overlay: "index.html", toasts: "toasts.html", chip: "chip.html", onboarding: "onboarding.html", history: "history.html" },
+      input: Object.fromEntries(
+        ["index", "toasts", "chip", "onboarding", "history"].map((p) => [p, new URL(`./src/${p}.html`, import.meta.url).pathname]),
+      ),
     },
   },
   // 2. tauri expects a fixed port, fail if that port is not available

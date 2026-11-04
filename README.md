@@ -94,7 +94,7 @@ src-tauri/src/
   gate.rs       MCP server + permission policy + audit log
   history.rs    reads past tasks for the History window
   onboarding.rs first-run setup
-src/            TypeScript for each window (pill, cards, chip, setup, history)
+src/            each window as page + script + styles (pill, cards, chip, setup, history)
 DESIGN.md       the design doc and build plan
 ```
 
