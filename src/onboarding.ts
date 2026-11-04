@@ -127,7 +127,7 @@ function renderCaps() {
 const LOGOS = {
   claude: new URL("./logos/claude.png", import.meta.url).href,
   codex: new URL("./logos/openai.png", import.meta.url).href,
-  gemini: new URL("./logos/gemini.svg", import.meta.url).href,
+  gemini: new URL("./logos/gemini.png", import.meta.url).href,
   ollama: new URL("./logos/ollama.png", import.meta.url).href,
 };
 
