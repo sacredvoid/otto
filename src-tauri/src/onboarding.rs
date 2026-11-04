@@ -151,7 +151,6 @@ pub fn request_mic() {
 pub fn open_settings(pane: String) {
     let url = match pane.as_str() {
         "microphone" => "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
-        "notifications" => "x-apple.systempreferences:com.apple.Notifications-Settings.extension",
         _ => return,
     };
     let _ = Command::new("open").arg(url).spawn();

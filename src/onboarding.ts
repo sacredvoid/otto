@@ -248,7 +248,6 @@ next.addEventListener("click", async () => {
   }
 });
 $("mic-btn").addEventListener("click", () => invoke("request_mic"));
-$("notif-btn").addEventListener("click", () => invoke("open_settings", { pane: "notifications" }));
 
 listen<{ state: string; text: string | null }>("otto://pill", (e) => {
   if (e.payload.state !== "heard" || !e.payload.text) return;
