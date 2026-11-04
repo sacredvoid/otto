@@ -257,6 +257,18 @@ pub fn run() {
             println!("[otto] hold Ctrl+Option+Space to talk");
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Otto");
+        .build(tauri::generate_context!())
+        .expect("error while building Otto")
+        .run(|app, event| {
+            // No Dock icon and the menu bar icon can hide behind the notch, so
+            // opening Otto.app again shows a window instead of doing nothing.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                if onboarding::is_onboarded() {
+                    history::show(app);
+                } else {
+                    onboarding::show_onboarding(app);
+                }
+            }
+        });
 }
