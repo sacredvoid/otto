@@ -10,10 +10,10 @@ export default defineConfig(() => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
-  // Pages: pill (index.html), task cards, corner chip, onboarding.
+  // Pages: pill (index.html), task cards, corner chip, onboarding, history.
   build: {
     rollupOptions: {
-      input: { overlay: "index.html", toasts: "toasts.html", chip: "chip.html", onboarding: "onboarding.html" },
+      input: { overlay: "index.html", toasts: "toasts.html", chip: "chip.html", onboarding: "onboarding.html", history: "history.html" },
     },
   },
   // 2. tauri expects a fixed port, fail if that port is not available

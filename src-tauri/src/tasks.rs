@@ -111,7 +111,7 @@ impl Tasks {
 #[derive(Serialize)]
 pub struct Details {
     summary: String,
-    files: Vec<String>,
+    pub(crate) files: Vec<String>,
 }
 
 pub fn details(dir: &Path) -> Details {
@@ -305,7 +305,7 @@ pub(crate) fn claude_command(claude: &Path, prompt: &str, dir: &Path, gate_url: 
 
 /// The card preview: the closing paragraph (the system prompt asks for a short
 /// plain summary there), without Markdown symbols. Full text lives in result.md.
-fn preview(text: &str) -> String {
+pub(crate) fn preview(text: &str) -> String {
     let last = text
         .split("\n\n")
         .map(str::trim)
@@ -315,7 +315,7 @@ fn preview(text: &str) -> String {
     last.replace("**", "").replace('`', "").split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn describe_tool(name: &str, input: &Value) -> String {
+pub(crate) fn describe_tool(name: &str, input: &Value) -> String {
     let file = || {
         input["file_path"]
             .as_str()

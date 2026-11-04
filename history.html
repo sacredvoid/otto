@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Otto History</title>
+    <link rel="stylesheet" href="/src/history.css" />
+    <link rel="stylesheet" href="/src/mascot.css" />
+    <script type="module" src="/src/history.ts"></script>
+  </head>
+  <body>
+    <aside aria-label="Past tasks">
+      <div class="brand">
+        <svg width="22" height="22" viewBox="0 0 100 100" aria-hidden="true">
+          <path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3" />
+          <path d="M34 46 Q39 40 44 46 M56 46 Q61 40 66 46" fill="none" stroke="#2F6F62" stroke-width="6" stroke-linecap="round" />
+          <path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round" />
+        </svg>
+        <span>History</span>
+      </div>
+      <input id="search" type="search" placeholder="Search what you said" aria-label="Search tasks" autocomplete="off" spellcheck="false" />
+      <ul id="list" role="listbox" aria-label="Tasks" tabindex="0"></ul>
+      <p id="no-match" class="muted small pad" hidden>No tasks match.</p>
+    </aside>
+
+    <main id="detail" aria-live="polite">
+      <div id="empty" class="empty">
+        <svg width="80" height="80" viewBox="0 0 100 100" aria-hidden="true">
+          <g class="m breathe">
+            <path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3" />
+            <path d="M34 47 H44 M56 47 H66" stroke="#2F6F62" stroke-width="5" stroke-linecap="round" />
+            <path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round" />
+          </g>
+        </svg>
+        <p class="lead">No tasks yet.</p>
+        <p class="muted small">Hold Ctrl+Option+Space and say what you need. It will show up here.</p>
+      </div>
+      <article id="task" hidden>
+        <blockquote id="transcript"></blockquote>
+        <p id="meta" class="muted small"></p>
+        <div id="result" class="result" tabindex="0" aria-label="Result"></div>
+        <details id="steps-box">
+          <summary>Steps</summary>
+          <ol id="steps"></ol>
+        </details>
+        <details id="approvals-box">
+          <summary>Approvals</summary>
+          <ul id="approvals"></ul>
+        </details>
+        <div class="files">
+          <div id="files" class="chips"></div>
+          <button id="finder" type="button" class="ghost">Show in Finder</button>
+        </div>
+      </article>
+    </main>
+  </body>
+</html>

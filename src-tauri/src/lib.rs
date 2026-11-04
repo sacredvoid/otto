@@ -1,5 +1,6 @@
 mod audio;
 mod gate;
+mod history;
 mod onboarding;
 mod overlay;
 mod stt;
@@ -185,11 +186,12 @@ pub fn run() {
         .manage(tasks::Tasks::default())
         .invoke_handler(tauri::generate_handler![task_details, open_task_file, show_task_folder, cancel_task, answer_approval, set_toasts_height, set_chip_size,
             onboarding::onboarding_info, onboarding::onboarding_detect, onboarding::mic_status, onboarding::request_mic,
-            onboarding::open_settings, onboarding::finish_onboarding])
-        // The onboarding window is reopened later from the tray, so closing only hides it.
+            onboarding::open_settings, onboarding::finish_onboarding,
+            history::list_history, history::history_detail, history::open_history_file, history::show_history_folder])
+        // Onboarding and History are reopened later from the tray, so closing only hides them.
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "onboarding" {
+                if matches!(window.label(), "onboarding" | "history") {
                     api.prevent_close();
                     let _ = window.hide();
                 }
