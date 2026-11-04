@@ -25,3 +25,6 @@ dist-ssr
 
 # Agent worktrees
 .claude/worktrees/
+
+# Speech model, fetched at build time
+models/

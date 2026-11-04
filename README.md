@@ -1,27 +1,16 @@
-<p align="center">
-  <img src="docs/otto.svg" width="110" alt="Otto, a small pebble mascot">
-</p>
+<h1 align="center"><img src="docs/otto.svg" width="44" align="center" alt=""> Otto</h1>
 
-<h1 align="center">Otto</h1>
+<p align="center"><b>Talk to your Mac. Claude Code does it in the background.</b></p>
 
 <p align="center">
-  <b>Hold a key, say what you need, keep working.</b><br>
-  A voice-first background assistant for macOS, powered by the Claude Code you already have.
+  <a href="https://github.com/sacredvoid/otto/releases/latest"><img alt="Download for macOS" src="https://img.shields.io/badge/Download-macOS%20(Apple%20Silicon)-24594a?style=for-the-badge&logo=apple&logoColor=white"></a>
 </p>
 
 <p align="center">
-  <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-1c2622?style=flat-square&logo=apple&logoColor=white">
-  <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24594a?style=flat-square&logo=tauri&logoColor=white">
-  <img alt="Rust" src="https://img.shields.io/badge/Rust-2024-2b5677?style=flat-square&logo=rust&logoColor=white">
-  <img alt="Local speech" src="https://img.shields.io/badge/speech-on--device-5b6b65?style=flat-square">
-  <img alt="Status" src="https://img.shields.io/badge/status-early%20preview-c98a2b?style=flat-square">
+  <img src="docs/hero.svg" width="880" alt="Otto in five steps: hold the hotkey and talk, Otto transcribes it, works in the background, asks before sending, then shows the result.">
 </p>
 
----
-
-You're in the middle of something and remember another job: *"make a five-slide outline on Q3 hiring"*, *"find that lease PDF and tell me what it says about pets"*, *"what's on my calendar Thursday?"* Normally you'd switch windows and lose your place.
-
-With Otto you hold **Ctrl + Option + Space**, say it, and let go. The speech is transcribed on your Mac and handed to Claude Code as a background task. You go back to what you were doing. A small chip in the corner shows what's running, and the result shows up as a card when it's ready.
+Hold **Ctrl + Option + Space**, say what you need, let go, and keep working. Otto hands the task to Claude Code, shows progress in a small corner chip, and asks before anything risky.
 
 ## What it does
 
@@ -37,39 +26,41 @@ With Otto you hold **Ctrl + Option + Space**, say it, and let go. The speech is 
 
 ## How it works
 
+```mermaid
+flowchart LR
+  A["Hold hotkey, talk"] --> B["Whisper<br/>(on your Mac)"]
+  B --> C["Claude Code task<br/>(restricted mode)"]
+  C -->|"wants to act"| G{"Otto's gate"}
+  G -->|"safe"| R["Runs"]
+  G -->|"risky"| Y["Asks you"]
+  Y -->|"Allow"| R
+  R --> D["Result card<br/>+ History"]
+  G -.->|"every decision"| L[("audit log")]
 ```
- hotkey ─▶ mic ─▶ whisper.cpp (local) ─▶ transcript
-                                            │
-                                            ▼
-                          claude -p --restricted  (one per task)
-                                            │
-             every permission prompt ──▶ Otto's MCP gate (localhost)
-                                            │            │
-                              allow / ask you / block    audit.jsonl
-                                            │
-                       chip · approval cards · result cards · History
-```
 
-Otto has no model of its own. For each task it starts the `claude` CLI in restricted mode. In that mode Claude Code ignores your personal allow-rules and hooks, and every permission question goes to the gate built into Otto. The gate's rules live in one pure, unit-tested function (`src-tauri/src/gate.rs`). A task that has read your files or email is marked *tainted*, and after that any web access needs your OK. So a poisoned web page or email can't quietly send your data anywhere without you seeing it first.
+Otto has no model of its own. Each request runs as a `claude -p` task in restricted mode, so your personal allow-rules and hooks are ignored and every permission question comes to Otto's gate. Once a task reads your files or email it's marked tainted, and after that any web access needs your OK too.
 
-## Getting started
+## Install
 
-**You'll need:** macOS 14+, [Rust](https://rustup.rs), Node 20+, and [Claude Code](https://docs.claude.com/claude-code) installed and logged in.
+1. Install [Claude Code](https://docs.claude.com/claude-code) and log in once (`claude` in a terminal).
+2. [Download Otto](https://github.com/sacredvoid/otto/releases/latest), open the DMG, and drag Otto to Applications.
+3. Open Otto. macOS will block it the first time because it isn't notarized yet: go to System Settings, Privacy & Security, and click **Open Anyway**.
+4. The setup window walks you through microphone access and which folders Otto may read.
+
+The speech model ships inside the app, so there's nothing else to download.
+
+<details>
+<summary>Build from source</summary>
+
+Needs Rust and Node 20+.
 
 ```bash
-git clone https://github.com/sacredvoid/otto.git
-cd otto
+git clone https://github.com/sacredvoid/otto.git && cd otto
 npm install
-
-# Speech model (~140 MB, one time)
-mkdir -p ~/Library/Application\ Support/app.otto.desktop/models
-curl -L -o ~/Library/Application\ Support/app.otto.desktop/models/ggml-base.en.bin \
-  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
-
-npm run tauri dev
+npm run tauri dev      # run it
+npm run tauri build    # make Otto.app and the DMG (fetches the speech model first)
 ```
-
-The setup window opens on first launch. It walks you through microphone access, picking which folders Otto may read, and a practice run of the hotkey.
+</details>
 
 ## Configuration
 
@@ -107,9 +98,9 @@ DESIGN.md       the design doc and build plan
 - [x] Corner chip, approval cards, onboarding, History
 - [x] Connectors, memory, Mac app control
 - [ ] Other AI backends: Codex CLI, Gemini CLI, OpenAI-compatible APIs, Ollama
-- [ ] Download the speech model from inside the app
-- [ ] Signed, notarized DMG with auto-update
+- [x] Downloadable DMG
+- [ ] Notarized build with auto-update
 
 ## Status
 
-Early preview. I use it daily, it has rough edges, and I've only run it on Apple Silicon.
+Early preview. I use it daily, it has rough edges, and it only runs on Apple Silicon for now.

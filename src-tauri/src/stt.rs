@@ -8,10 +8,19 @@ pub struct Stt {
     ctx: WhisperContext,
 }
 
+const MODEL: &str = "ggml-base.en.bin";
+
+/// A model the user placed in Application Support wins (lets them swap in a bigger one);
+/// otherwise the one bundled in Otto.app/Contents/Resources/models.
 pub fn default_model_path() -> PathBuf {
-    dirs::data_dir()
-        .unwrap_or_default()
-        .join("app.otto.desktop/models/ggml-base.en.bin")
+    let user = dirs::data_dir().unwrap_or_default().join("app.otto.desktop/models").join(MODEL);
+    if user.is_file() {
+        return user;
+    }
+    let bundled = std::env::current_exe()
+        .ok()
+        .and_then(|exe| Some(exe.parent()?.parent()?.join("Resources/models").join(MODEL)));
+    bundled.filter(|p| p.is_file()).unwrap_or(user)
 }
 
 impl Stt {

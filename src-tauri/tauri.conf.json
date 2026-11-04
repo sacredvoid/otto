@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "sh scripts/fetch-model.sh && npm run build",
     "frontendDist": "../dist"
   },
   "app": {
@@ -87,7 +87,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["app", "dmg"],
+    "resources": { "../models/ggml-base.en.bin": "models/ggml-base.en.bin" },
+    "macOS": { "minimumSystemVersion": "13.0", "signingIdentity": "-" },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
