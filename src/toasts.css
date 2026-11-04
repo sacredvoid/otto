@@ -203,7 +203,7 @@ body {
   font-size: 12px;
   line-height: 1.45;
   white-space: pre-wrap;
-  word-break: break-all;
+  overflow-wrap: anywhere; /* wrap at spaces; only split long URLs or tokens */
   user-select: text;
 }
 .card[data-expanded] .sub {

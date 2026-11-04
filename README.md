@@ -29,7 +29,7 @@ Hold **Ctrl + Option + Space**, say what you need, let go, and keep working. Ott
 
 **History** shows every request as a trace: what you said, each step Otto took with its approval, the output, and the result. Follow-ups stay in the same thread.
 
-<img src="docs/screenshots/history.png" alt="History window: a request to reply to Priya, the Gmail search that ran automatically, the send you allowed, the result, and a follow-up asking about Zoom." width="100%">
+<img src="docs/screenshots/history.png" alt="History window: a request to reply to Jordan, the Gmail search that ran automatically, the send you allowed, the result, and a follow-up asking about Zoom." width="100%">
 
 <table>
   <tr>

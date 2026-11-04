@@ -1,115 +1,164 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 340" width="880" height="340" role="img" aria-label="Otto in five steps: hold the hotkey and talk, Otto transcribes it, works in the background, asks before sending, then shows the result.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 420" width="880" height="420" role="img" aria-label="Otto on a Mac: hold Control Option Space and ask it to reply to Jordan, it transcribes on your Mac, checks Gmail in the background, waits for you to allow the send, then shows the result.">
   <style>
-    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif; }
     .cap { font-size: 15px; font-weight: 600; fill: #24594a; }
     .num { font-size: 12px; font-weight: 700; fill: #fff; }
-    .t { font-size: 14px; font-weight: 600; fill: #1c2622; }
-    .s { font-size: 13px; fill: #5b6b65; }
-    .m { font-size: 12px; fill: #3a4a44; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .card { fill: #fff; stroke: #e3ebe7; }
-    .sc { opacity: 0; animation: 15s linear infinite; }
-    .s1 { animation-name: a1; } .s2 { animation-name: a2; } .s3 { animation-name: a3; }
-    .s4 { animation-name: a4; } .s5 { animation-name: a5; } .s34 { animation-name: a34; }
-    @keyframes a1 { 0%, 17% { opacity: 1 } 20%, 100% { opacity: 0 } }
-    @keyframes a2 { 0%, 20% { opacity: 0 } 23%, 37% { opacity: 1 } 40%, 100% { opacity: 0 } }
-    @keyframes a3 { 0%, 40% { opacity: 0 } 43%, 57% { opacity: 1 } 60%, 100% { opacity: 0 } }
-    @keyframes a4 { 0%, 60% { opacity: 0 } 63%, 77% { opacity: 1 } 80%, 100% { opacity: 0 } }
-    @keyframes a5 { 0%, 80% { opacity: 0 } 83%, 97% { opacity: 1 } 100% { opacity: 0 } }
-    @keyframes a34 { 0%, 40% { opacity: 0 } 43%, 77% { opacity: 1 } 80%, 100% { opacity: 0 } }
-    .bar { transform-box: fill-box; transform-origin: center; animation: wave .9s ease-in-out infinite alternate; }
-    .bar:nth-child(2) { animation-delay: -.3s } .bar:nth-child(3) { animation-delay: -.6s }
-    .bar:nth-child(4) { animation-delay: -.15s } .bar:nth-child(5) { animation-delay: -.45s }
-    @keyframes wave { from { transform: scaleY(.3) } to { transform: scaleY(1) } }
-    .run { animation: run 1.6s ease-in-out infinite; }
-    @keyframes run { from { transform: translateX(-60px) } to { transform: translateX(150px) } }
+    .menu { font-size: 12px; fill: #1c2622; }
+    .h { font-size: 17px; font-weight: 700; fill: #1c2622; }
+    .p { font-size: 13px; fill: #3a4a44; }
+    .t { font-size: 13.5px; font-weight: 600; fill: #1c2622; }
+    .s { font-size: 12.5px; fill: #5b6b65; }
+    .a { font-size: 12.5px; font-weight: 500; fill: #5b6b65; }
+    .m { font-size: 11.5px; fill: #24394c; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .sc { opacity: 0; animation: 16s linear infinite; }
+    .s1 { animation-name: s1; } .s2 { animation-name: s2; } .s3 { animation-name: s3; }
+    .s4 { animation-name: s4; } .s5 { animation-name: s5; } .s3a { animation-name: s3a; } .s3b { animation-name: s3b; }
+    .s34 { animation-name: s34; } .s34a { animation-name: s34a; } .s34b { animation-name: s34b; }
+    @keyframes s1 { 0%, 18% { opacity: 1 } 19.5%, 100% { opacity: 0 } }
+    @keyframes s2 { 0%, 18.5% { opacity: 0 } 20%, 36% { opacity: 1 } 37.5%, 100% { opacity: 0 } }
+    @keyframes s3 { 0%, 36.5% { opacity: 0 } 38%, 55% { opacity: 1 } 56.5%, 100% { opacity: 0 } }
+    @keyframes s4 { 0%, 55.5% { opacity: 0 } 57%, 80% { opacity: 1 } 81.5%, 100% { opacity: 0 } }
+    @keyframes s5 { 0%, 80.5% { opacity: 0 } 82%, 98% { opacity: 1 } 99.5%, 100% { opacity: 0 } }
+    @keyframes s3a { 0%, 36.5% { opacity: 0 } 38%, 46% { opacity: 1 } 47.5%, 100% { opacity: 0 } }
+    @keyframes s3b { 0%, 46.0% { opacity: 0 } 47.5%, 55% { opacity: 1 } 56.5%, 100% { opacity: 0 } }
+    @keyframes s34 { 0%, 36.5% { opacity: 0 } 38%, 80% { opacity: 1 } 81.5%, 100% { opacity: 0 } }
+    @keyframes s34a { 0%, 36.5% { opacity: 0 } 38%, 55% { opacity: 1 } 56.5%, 100% { opacity: 0 } }
+    @keyframes s34b { 0%, 55.5% { opacity: 0 } 57%, 80% { opacity: 1 } 81.5%, 100% { opacity: 0 } }
+    .slide { animation: slide 16s ease-out infinite; }
+    @keyframes slide { 0%, 38% { transform: translateX(28px) } 40%, 100% { transform: none } }
+    .pop3, .pop4, .pop5 { transform-box: fill-box; transform-origin: center; animation: 16s ease-out infinite; }
+    .pop3 { animation-name: pop3; } .pop4 { animation-name: pop4; }
+    @keyframes pop3 { 0%, 39% { transform: scale(0) } 41% { transform: scale(1.25) } 42.5%, 100% { transform: scale(1) } }
+    @keyframes pop4 { 0%, 57.5% { transform: scale(0) } 59.5% { transform: scale(1.25) } 61%, 100% { transform: scale(1) } }
+    .cursor { animation: cursor 16s ease-in-out infinite; }
+    @keyframes cursor { 0%, 66% { transform: translate(90px, 70px) } 72%, 100% { transform: none } }
+    .press { animation: press 16s linear infinite; }
+    @keyframes press { 0%, 73% { fill: #2b5677 } 74%, 76% { fill: #1b3a52 } 77%, 100% { fill: #2b5677 } }
+    .bar { transform-box: fill-box; transform-origin: center; animation: wave .8s ease-in-out infinite alternate; }
+    .bar:nth-child(2) { animation-delay: -.3s } .bar:nth-child(3) { animation-delay: -.6s } .bar:nth-child(4) { animation-delay: -.15s }
+    .bar:nth-child(5) { animation-delay: -.45s } .bar:nth-child(6) { animation-delay: -.7s } .bar:nth-child(7) { animation-delay: -.2s }
+    @keyframes wave { from { transform: scaleY(.25) } to { transform: scaleY(1) } }
+    .bob { animation: bob 1.4s ease-in-out infinite alternate; }
+    @keyframes bob { from { transform: translateY(0) } to { transform: translateY(-4px) } }
     .blink { transform-box: fill-box; transform-origin: center; animation: blink 3s infinite; }
     @keyframes blink { 0%, 92%, 100% { transform: scaleY(1) } 95% { transform: scaleY(.1) } }
-    @media (prefers-reduced-motion: reduce) { .sc, .bar, .run, .blink { animation: none; } .s5 { opacity: 1; } }
+    .caret { animation: caret 1s steps(1) infinite; }
+    @keyframes caret { 50% { opacity: 0 } }
+    .type { animation: type 16s linear infinite; }
+    @keyframes type { 0%, 20% { width: 0 } 90%, 100% { width: 262px } }
+    .typed { animation: typed 16s linear infinite; }
+    @keyframes typed { 0%, 20% { transform: translateX(0) } 90%, 100% { transform: translateX(262px) } }
+    .key { animation: key 16s linear infinite; }
+    @keyframes key { 0%, 1% { transform: translateY(0) } 2%, 17% { transform: translateY(2px) } 18%, 100% { transform: translateY(0) } }
+    @media (prefers-reduced-motion: reduce) {
+      .sc, .slide, .pop3, .pop4, .cursor, .press, .bar, .bob, .blink, .caret, .type, .typed, .key { animation: none; }
+      .s5 { opacity: 1; }
+    }
   </style>
-
   <defs>
-    <linearGradient id="desk" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#EEF6F2"/><stop offset="1" stop-color="#E3EEF6"/>
-    </linearGradient>
-    <clipPath id="barclip"><rect x="674" y="304" width="150" height="3" rx="1.5"/></clipPath>
-    <filter id="sh" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#1c2622" flood-opacity=".12"/></filter>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9e7f0"/><stop offset=".55" stop-color="#e6eef0"/><stop offset="1" stop-color="#e7e2ef"/></linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="6" stdDeviation="9" flood-color="#1c2622" flood-opacity=".13"/></filter>
+    <filter id="bsh" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#142832" flood-opacity=".28"/></filter>
+    <clipPath id="desk"><rect x="20" y="60" width="840" height="344" rx="14"/></clipPath>
+    <clipPath id="typeclip"><rect class="type" x="72" y="296" height="20" width="0"/></clipPath>
   </defs>
 
-  <rect width="880" height="340" rx="20" fill="url(#desk)"/>
+  <rect width="880" height="420" rx="20" fill="#f4f7f6"/>
+  <g class="sc s1"><circle cx="40" cy="30" r="12" fill="#2f6f62"/><text class="num" x="40" y="34.5" text-anchor="middle">1</text><text class="cap" x="60" y="35">Hold ⌃ ⌥ Space and say what you need</text></g>
+  <g class="sc s2"><circle cx="40" cy="30" r="12" fill="#2f6f62"/><text class="num" x="40" y="34.5" text-anchor="middle">2</text><text class="cap" x="60" y="35">Let go. It's transcribed on your Mac</text></g>
+  <g class="sc s3"><circle cx="40" cy="30" r="12" fill="#2f6f62"/><text class="num" x="40" y="34.5" text-anchor="middle">3</text><text class="cap" x="60" y="35">Otto works on it in the background</text></g>
+  <g class="sc s4"><circle cx="40" cy="30" r="12" fill="#2f6f62"/><text class="num" x="40" y="34.5" text-anchor="middle">4</text><text class="cap" x="60" y="35">Anything that sends or changes waits for you</text></g>
+  <g class="sc s5"><circle cx="40" cy="30" r="12" fill="#2f6f62"/><text class="num" x="40" y="34.5" text-anchor="middle">5</text><text class="cap" x="60" y="35">The result lands when it's done</text></g>
 
-  <!-- the work you keep doing -->
-  <g opacity=".85">
-    <rect x="36" y="64" width="470" height="244" rx="12" fill="#fff" stroke="#e3ebe7"/>
-    <circle cx="56" cy="82" r="5" fill="#eed6d3"/><circle cx="72" cy="82" r="5" fill="#f2e6c9"/><circle cx="88" cy="82" r="5" fill="#d6ecdf"/>
-    <g fill="#e9efec">
-      <rect x="60" y="112" width="300" height="9" rx="4.5"/><rect x="60" y="134" width="390" height="9" rx="4.5"/>
-      <rect x="60" y="156" width="340" height="9" rx="4.5"/><rect x="60" y="178" width="250" height="9" rx="4.5"/>
-      <rect x="60" y="214" width="370" height="9" rx="4.5"/><rect x="60" y="236" width="310" height="9" rx="4.5"/>
+  <g clip-path="url(#desk)">
+    <rect x="20" y="60" width="840" height="344" fill="url(#wall)"/>
+    <!-- menu bar -->
+    <rect x="20" y="60" width="840" height="24" fill="#fff" fill-opacity=".72"/>
+    <circle cx="40" cy="72" r="5" fill="#1c2622"/>
+    <text class="menu" x="56" y="76" style="font-weight:700">Notes</text>
+    <text class="menu" x="104" y="76">File</text><text class="menu" x="136" y="76">Edit</text><text class="menu" x="170" y="76">Format</text><text class="menu" x="222" y="76">View</text>
+    <g transform="translate(726 64)"><path d="M8 2 C13 1.6 16 4.6 15.6 8.6 C15.2 12.2 12.4 14 8.6 14 C4.6 14 2 11.6 2.4 8 C2.8 4.4 5.2 2.2 8 2 Z" fill="none" stroke="#1c2622" stroke-width="1.4"/><circle cx="6.6" cy="8" r="1" fill="#1c2622"/><circle cx="10.4" cy="8" r="1" fill="#1c2622"/></g>
+    <text class="menu" x="752" y="76">Wed 9:41 AM</text>
+
+    <!-- the work you keep doing -->
+    <g filter="url(#sh)"><rect x="48" y="104" width="420" height="270" rx="11" fill="#fff"/></g>
+    <rect x="48" y="104" width="420" height="30" rx="11" fill="#f6f8f7"/><rect x="48" y="122" width="420" height="12" fill="#f6f8f7"/>
+    <line x1="48" y1="134" x2="468" y2="134" stroke="#e8eeeb"/>
+    <circle cx="66" cy="119" r="5.5" fill="#ff5f57"/><circle cx="84" cy="119" r="5.5" fill="#febc2e"/><circle cx="102" cy="119" r="5.5" fill="#28c840"/>
+    <text class="s" x="258" y="123" text-anchor="middle" style="font-weight:600">Q3 planning</text>
+    <text class="h" x="72" y="168">Q3 planning</text>
+    <text class="p" x="72" y="198">• Hire two designers before September</text>
+    <text class="p" x="72" y="222">• Move the launch review to Thursday</text>
+    <text class="p" x="72" y="246">• Book the offsite venue (40 people)</text>
+    <text class="p" x="72" y="270">• Budget draft due on the 14th</text>
+    <g clip-path="url(#typeclip)"><text class="p" x="72" y="310">• Send the hiring plan to the team by Friday</text></g>
+    <rect class="typed" x="72" y="297" width="1.6" height="17" fill="#2f6f62"><animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/></rect>
+
+    <!-- 1: hotkey + listening pill -->
+    <g class="sc s1">
+      <g transform="translate(330 248)"><g class="key"><rect x="0" y="0" width="34" height="30" rx="7" fill="#fff" stroke="#cdd8d3"/><rect x="0" y="27" width="34" height="4" rx="2" fill="#cdd8d3"/><text x="17.0" y="20" text-anchor="middle" style="font-size:13px;font-weight:600;fill:#1c2622">⌃</text></g><g class="key"><rect x="40" y="0" width="34" height="30" rx="7" fill="#fff" stroke="#cdd8d3"/><rect x="40" y="27" width="34" height="4" rx="2" fill="#cdd8d3"/><text x="57.0" y="20" text-anchor="middle" style="font-size:13px;font-weight:600;fill:#1c2622">⌥</text></g><g class="key"><rect x="80" y="0" width="84" height="30" rx="7" fill="#fff" stroke="#cdd8d3"/><rect x="80" y="27" width="84" height="4" rx="2" fill="#cdd8d3"/><text x="122.0" y="20" text-anchor="middle" style="font-size:13px;font-weight:600;fill:#1c2622">space</text></g></g>
+      <g filter="url(#sh)"><rect x="300" y="300" width="280" height="48" rx="24" fill="#fff" stroke="#e3ebe7"/></g>
+      <svg x="306" y="304" width="40" height="40" viewBox="-10 -20 120 120"><g class="bob"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"/><circle cx="39" cy="44" r="6" fill="#2F6F62"/><circle cx="61" cy="44" r="6" fill="#2F6F62"/><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round"/></g></svg>
+      <text class="t" x="352" y="321">Listening</text><text class="s" x="352" y="338">release to send</text>
+      <g fill="#8cc9b2">
+        <rect class="bar" x="496" y="312" width="4" height="24" rx="2"/><rect class="bar" x="505" y="312" width="4" height="24" rx="2"/><rect class="bar" x="514" y="312" width="4" height="24" rx="2"/>
+        <rect class="bar" x="523" y="312" width="4" height="24" rx="2"/><rect class="bar" x="532" y="312" width="4" height="24" rx="2"/><rect class="bar" x="541" y="312" width="4" height="24" rx="2"/>
+        <rect class="bar" x="550" y="312" width="4" height="24" rx="2"/>
+      </g>
     </g>
-    <rect x="312" y="174" width="2" height="17" fill="#2f6f62"/>
-  </g>
 
-  <!-- captions -->
-  <g class="sc s1"><circle cx="48" cy="34" r="11" fill="#2f6f62"/><text class="num" x="48" y="38" text-anchor="middle">1</text><text class="cap" x="68" y="39">Hold ⌃ ⌥ Space and say what you need</text></g>
-  <g class="sc s2"><circle cx="48" cy="34" r="11" fill="#2f6f62"/><text class="num" x="48" y="38" text-anchor="middle">2</text><text class="cap" x="68" y="39">Let go. Whisper transcribes it on your Mac</text></g>
-  <g class="sc s3"><circle cx="48" cy="34" r="11" fill="#2f6f62"/><text class="num" x="48" y="38" text-anchor="middle">3</text><text class="cap" x="68" y="39">Claude Code works on it in the background</text></g>
-  <g class="sc s4"><circle cx="48" cy="34" r="11" fill="#2b5677"/><text class="num" x="48" y="38" text-anchor="middle">4</text><text class="cap" x="68" y="39" style="fill:#2b5677">Anything risky waits for your OK</text></g>
-  <g class="sc s5"><circle cx="48" cy="34" r="11" fill="#2f6f62"/><text class="num" x="48" y="38" text-anchor="middle">5</text><text class="cap" x="68" y="39">The result lands when it's done</text></g>
-
-  <!-- 1: listening pill -->
-  <g class="sc s1" filter="url(#sh)">
-    <rect class="card" x="170" y="262" width="210" height="44" rx="22"/>
-    <circle cx="196" cy="284" r="11" fill="#ddf1e6"/><circle cx="196" cy="284" r="5" fill="#2f6f62"/>
-    <g fill="#8cc9b2">
-      <rect class="bar" x="218" y="272" width="4" height="24" rx="2"/><rect class="bar" x="227" y="272" width="4" height="24" rx="2"/>
-      <rect class="bar" x="236" y="272" width="4" height="24" rx="2"/><rect class="bar" x="245" y="272" width="4" height="24" rx="2"/>
-      <rect class="bar" x="254" y="272" width="4" height="24" rx="2"/>
+    <!-- 2: transcript -->
+    <g class="sc s2">
+      <g filter="url(#sh)"><rect x="236" y="300" width="408" height="48" rx="24" fill="#ddf1e6"/></g>
+      <svg x="242" y="304" width="40" height="40" viewBox="-10 -20 120 120"><g class=""><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#BFE5D2"/><path d="M33 47 Q39 39 45 47 M55 47 Q61 39 67 47" fill="none" stroke="#2F6F62" stroke-width="5" stroke-linecap="round"/><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round"/></g></svg>
+      <text class="t" x="288" y="321">Got it</text>
+      <text class="s" x="288" y="338" style="fill:#24594a">"Reply to Jordan that Friday at 3 works"</text>
     </g>
-    <text class="s" x="272" y="289">Listening…</text>
-  </g>
 
-  <!-- 2: heard pill -->
-  <g class="sc s2" filter="url(#sh)">
-    <rect class="card" x="90" y="262" width="380" height="44" rx="22"/>
-    <circle cx="116" cy="284" r="11" fill="#ddf1e6"/><path d="M110 284 l4 4 l8 -8" fill="none" stroke="#2f6f62" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-    <text class="t" x="136" y="289" style="font-weight:500">"Reply to Priya, Friday at 3 works"</text>
-    <text class="s" x="408" y="289">0.4s</text>
-  </g>
+    <!-- 3: working -->
+    <g class="sc s3"><g class="slide">
+      <g filter="url(#sh)"><rect x="512" y="100" width="340" height="84" rx="14" fill="#fff" stroke="#e3ebe7"/></g>
+      <svg x="526" y="112" width="36" height="36" viewBox="-10 -20 120 120"><g class="bob"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"/><circle class="blink" cx="76" cy="44" r="5.5" fill="#2F6F62"/><path d="M58 73 L66 78 L58 83 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round"/></g></svg>
+      <g class="pop3"><circle cx="559" cy="145" r="11" fill="#fff" filter="url(#bsh)"/><image href="data:image/png;base64,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" x="552" y="138" width="14" height="14"/></g>
+      <text class="t" x="574" y="126">Reply to Jordan</text>
+      <text class="s sc s3a" x="574" y="146">Gmail: search threads</text>
+      <text class="s sc s3b" x="574" y="146">Gmail: read thread</text>
+      <text class="a" x="574" y="170">Cancel</text>
+    </g></g>
 
-  <!-- 3 and 4: corner chip -->
-  <g class="sc s3" filter="url(#sh)">
-    <rect class="card" x="628" y="258" width="214" height="56" rx="16"/>
-    <g transform="translate(638 264) scale(.3)"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"/><circle class="blink" cx="76" cy="44" r="5.5" fill="#2F6F62"/></g>
-    <text class="t" x="674" y="279" style="font-size:13px">Reply to Priya</text>
-    <text class="s" x="674" y="294" style="font-size:12px">Reading your email…</text>
-    <g clip-path="url(#barclip)"><rect x="674" y="304" width="150" height="3" fill="#e3ebe7"/><rect class="run" x="674" y="304" width="60" height="3" fill="#8cc9b2"/></g>
-  </g>
-  <g class="sc s4" filter="url(#sh)">
-    <rect class="card" x="660" y="270" width="182" height="36" rx="18"/>
-    <g transform="translate(668 271) scale(.3)"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"/><circle cx="39" cy="44" r="6.5" fill="#1F3E5A"/><circle cx="61" cy="44" r="6.5" fill="#1F3E5A"/></g>
-    <text class="t" x="704" y="293" style="font-size:13px;fill:#2b5677;font-weight:500">1 needs you</text>
-  </g>
+    <!-- 4: needs you -->
+    <g class="sc s4">
+      <g filter="url(#sh)"><rect x="512" y="100" width="340" height="168" rx="14" fill="#f4f8fc" stroke="#cfdeeb"/></g>
+      <svg x="526" y="114" width="36" height="36" viewBox="-10 -20 120 120"><g class="bob"><path d="M44 -12 Q44 -19 50.5 -19 Q57 -19 57 -13 Q57 -9 51 -6 V-2" fill="none" stroke="#2B5677" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="51" cy="5" r="3" fill="#2B5677"/><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"/><circle cx="39" cy="44" r="6.5" fill="#1F3E5A"/><circle cx="61" cy="44" r="6.5" fill="#1F3E5A"/><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#7FAED6" stroke="#7FAED6" stroke-width="6" stroke-linejoin="round"/></g></svg>
+      <g class="pop4"><circle cx="559" cy="147" r="11" fill="#fff" filter="url(#bsh)"/><image href="data:image/png;base64,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" x="552" y="140" width="14" height="14"/></g>
+      <text class="t" x="574" y="126">Reply to Jordan</text>
+      <text class="s" x="574" y="146">Gmail: send message</text>
+      <rect x="574" y="158" width="262" height="56" rx="8" fill="#e6eef6"/>
+      <text class="m" x="584" y="178">To: jordan@northwind.co</text>
+      <text class="m" x="584" y="197">Friday at 3 works. See you then!</text>
+      <rect class="press" x="574" y="226" width="58" height="28" rx="8" fill="#2b5677"/>
+      <text x="603" y="245" text-anchor="middle" style="font-size:12.5px;font-weight:600;fill:#fff">Allow</text>
+      <text class="a" x="648" y="245">Don't allow</text>
+      <text class="a" x="732" y="245">Cancel</text>
+      <g class="cursor"><path transform="translate(612 240)" d="M0 0 L0 17 L4.5 13 L7.5 20 L10.5 18.6 L7.6 12 L13 12 Z" fill="#1c2622" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></g>
+    </g>
 
-  <!-- 4: approval card -->
-  <g class="sc s4" filter="url(#sh)">
-    <rect x="548" y="64" width="294" height="186" rx="14" fill="#f5f9fd" stroke="#cfe0ef"/>
-    <text class="s" x="566" y="90" style="font-size:12px">Reply to Priya</text>
-    <text class="t" x="566" y="112">Gmail: send message</text>
-    <rect x="566" y="124" width="258" height="64" rx="8" fill="#e8f0f7"/>
-    <text class="m" x="578" y="146">to: priya@studio.co</text>
-    <text class="m" x="578" y="166">"Friday at 3 works for me,</text>
-    <text class="m" x="578" y="180">see you then."</text>
-    <rect x="566" y="202" width="86" height="32" rx="8" fill="#2b5677"/><text x="609" y="223" text-anchor="middle" style="font-size:13px;font-weight:600;fill:#fff">Allow</text>
-    <text class="s" x="672" y="223">Don't allow</text>
-  </g>
+    <!-- 5: done -->
+    <g class="sc s5">
+      <g filter="url(#sh)"><rect x="512" y="100" width="340" height="104" rx="14" fill="#fff" stroke="#e3ebe7"/></g>
+      <svg x="526" y="112" width="36" height="36" viewBox="-10 -20 120 120"><g class=""><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#BFE5D2"/><path d="M33 47 Q39 39 45 47 M55 47 Q61 39 67 47" fill="none" stroke="#2F6F62" stroke-width="5" stroke-linecap="round"/><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round"/></g></svg>
+      <text class="t" x="574" y="126">Reply to Jordan</text>
+      <text class="s" x="574" y="146">Replied on the thread: "Friday at 3</text>
+      <text class="s" x="574" y="164">works. See you then!"</text>
+      <text x="574" y="190" style="font-size:12.5px;font-weight:600;fill:#24594a">Open</text>
+      <text class="a" x="620" y="190">Show in Finder</text>
+    </g>
 
-  <!-- 5: result card -->
-  <g class="sc s5" filter="url(#sh)">
-    <rect class="card" x="548" y="64" width="294" height="140" rx="14"/>
-    <circle cx="574" cy="92" r="11" fill="#ddf1e6"/><path d="M568 92 l4 4 l8 -8" fill="none" stroke="#2f6f62" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-    <text class="t" x="594" y="97">Reply to Priya</text>
-    <text class="s" x="566" y="128">Sent from your Gmail:</text>
-    <text class="s" x="566" y="146">"Friday at 3 works for me."</text>
-    <rect x="566" y="162" width="118" height="26" rx="6" fill="#f3f7f5"/><text class="s" x="578" y="180" style="font-size:12px">View in History</text>
+    <!-- chip, bottom right -->
+    <g class="sc s34">
+      <g filter="url(#sh)"><rect x="700" y="356" width="144" height="34" rx="17" fill="#fff" stroke="#e3ebe7"/></g>
+      <g class="sc s34a"><svg x="704" y="359" width="28" height="28" viewBox="-10 -20 120 120"><g class="bob"><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"/><circle class="blink" cx="76" cy="44" r="5.5" fill="#2F6F62"/><path d="M58 73 L66 78 L58 83 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round"/></g></svg><image href="data:image/png;base64,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" x="738" y="366" width="14" height="14"/><text class="s" x="760" y="378" style="fill:#1c2622">1 running</text></g>
+      <g class="sc s34b"><svg x="704" y="359" width="28" height="28" viewBox="-10 -20 120 120"><g class=""><path d="M44 -12 Q44 -19 50.5 -19 Q57 -19 57 -13 Q57 -9 51 -6 V-2" fill="none" stroke="#2B5677" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="51" cy="5" r="3" fill="#2B5677"/><path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3"/><circle cx="39" cy="44" r="6.5" fill="#1F3E5A"/><circle cx="61" cy="44" r="6.5" fill="#1F3E5A"/><path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#7FAED6" stroke="#7FAED6" stroke-width="6" stroke-linejoin="round"/></g></svg><text class="s" x="738" y="378" style="fill:#2b5677;font-weight:600">1 needs you</text></g>
+    </g>
   </g>
 </svg>
