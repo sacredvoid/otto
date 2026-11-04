@@ -62,6 +62,10 @@ npm run tauri build    # make Otto.app and the DMG (fetches the speech model fir
 ```
 </details>
 
+## Follow-ups
+
+Start with "no", "actually", "make it…", "try again" and similar within 10 minutes of a task finishing, and Otto continues that task (same folder, same Claude session) instead of starting a new one. The pill says "Following up".
+
 ## Configuration
 
 Everything lives in `~/Otto/config.json`. Every key is optional.
@@ -71,7 +75,8 @@ Everything lives in `~/Otto/config.json`. Every key is optional.
   "readable_dirs": ["~/Documents", "~/Desktop"],          // read without asking
   "plugins": ["claude-mem@thedotmack"],                    // Claude Code plugins to load
   "mcp_servers": { "notion": { "type": "http", "url": "https://..." } },  // extra MCP servers
-  "allow_tools": ["mcp__plugin_claude-mem_mcp-search__search"]           // read-only tools that skip the prompt
+  "allow_tools": ["mcp__plugin_claude-mem_mcp-search__search"],          // read-only tools that skip the prompt
+  "model": "sonnet"                                        // optional: a faster model for quicker answers
 }
 ```
 

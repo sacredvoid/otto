@@ -314,6 +314,7 @@ const TOOLS: &str = "Read,Write,Edit,Glob,Grep,Bash,WebSearch,WebFetch,TodoWrite
 /// - "plugins": ["claude-mem@thedotmack"] Claude Code plugins to load (e.g. a memory plugin)
 /// - "mcp_servers": { "name": {...} } extra MCP servers, same shape as .mcp.json
 /// - "allow_tools": ["mcp__server__tool"] tools that run without asking (read-only ones only)
+/// - "model": "sonnet" Claude model for tasks (default: your Claude Code default). Faster models answer sooner.
 pub(crate) fn config() -> Value {
     std::fs::read(otto_dir().join("config.json"))
         .ok()
@@ -451,6 +452,9 @@ pub(crate) fn claude_command(claude: &Path, prompt: &str, dir: &Path, gate_url: 
         .env_remove("CLAUDE_CODE_PLUGIN_DIRS")
         // Approvals can take minutes; don't let Claude Code time out the gate call first.
         .env("MCP_TOOL_TIMEOUT", (gate::APPROVAL_TIMEOUT.as_millis() + 60_000).to_string());
+    if let Some(model) = config["model"].as_str().filter(|m| !m.is_empty()) {
+        cmd.arg("--model").arg(model);
+    }
     for d in &readable {
         cmd.arg("--add-dir").arg(d);
     }
