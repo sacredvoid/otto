@@ -4,6 +4,8 @@
 <dict>
   <key>NSMicrophoneUsageDescription</key>
   <string>Otto listens only while you hold the hotkey, so it can hear what you ask.</string>
+  <key>NSAppleEventsUsageDescription</key>
+  <string>Otto controls apps like Mail, Messages and Reminders when you ask it to, and only after you approve each action.</string>
   <key>LSUIElement</key>
   <true/>
 </dict>

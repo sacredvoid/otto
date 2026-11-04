@@ -19,6 +19,24 @@ pub const APPROVAL_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 /// we assume the task may have seen private data.
 const SEEN_WAIT: Duration = Duration::from_secs(2);
 
+/// Connector tools that only read. They run without asking but taint the task,
+/// so anything outbound afterwards still asks. Writes (send, create, delete) always ask.
+const READ_ONLY_CONNECTOR_TOOLS: [&str; 11] = [
+    "mcp__claude_ai_Gmail__search_threads",
+    "mcp__claude_ai_Gmail__get_thread",
+    "mcp__claude_ai_Gmail__get_message",
+    "mcp__claude_ai_Gmail__list_labels",
+    "mcp__claude_ai_Gmail__list_drafts",
+    "mcp__claude_ai_Gmail__get_draft",
+    "mcp__claude_ai_Google_Calendar__list_calendars",
+    "mcp__claude_ai_Google_Calendar__list_events",
+    "mcp__claude_ai_Google_Calendar__get_event",
+    "mcp__claude_ai_Google_Calendar__search_events",
+    "mcp__claude_ai_Google_Calendar__suggest_time",
+];
+
+const REMEMBER_MAX: usize = 500;
+
 /// Tool-config and VCS paths that `--restricted` protects; never auto-written.
 const PROTECTED: [&str; 5] = [".git", ".claude", ".mcp.json", ".claude.json", ".vscode"];
 
@@ -49,6 +67,8 @@ struct TaskCtx {
     written: HashSet<String>,
     /// Folders find_files may search.
     readable: Vec<PathBuf>,
+    /// Extra tools the user allowed in config.json ("allow_tools").
+    allow: Vec<String>,
 }
 
 pub struct Gate {
@@ -94,9 +114,9 @@ impl Gate {
         format!("http://127.0.0.1:{}/mcp/{}/{}", self.port, self.token, task_id)
     }
 
-    pub fn register(&self, task_id: u64, dir: &Path, title: &str, readable: Vec<PathBuf>) {
+    pub fn register(&self, task_id: u64, dir: &Path, title: &str, readable: Vec<PathBuf>, allow: Vec<String>) {
         let dir = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
-        let ctx = TaskCtx { dir, title: title.into(), readable, ..Default::default() };
+        let ctx = TaskCtx { dir, title: title.into(), readable, allow, ..Default::default() };
         self.tasks.lock().unwrap().insert(task_id, ctx);
     }
 
@@ -204,7 +224,9 @@ impl Gate {
         if input.len() > 4000 {
             input = format!("{}…", &input[..input.floor_char_boundary(4000)]);
         }
-        let line = json!({ "ts": unix_now(), "task": task_id, "tool": tool, "input": input, "decision": decision, "by": by });
+        // The task folder name is the stable id (task numbers restart every launch); History matches on it.
+        let folder = self.tasks.lock().unwrap().get(&task_id).and_then(|c| c.dir.file_name().map(|n| n.to_string_lossy().into_owned()));
+        let line = json!({ "ts": unix_now(), "task": task_id, "folder": folder, "tool": tool, "input": input, "decision": decision, "by": by });
         if let Some(f) = self.audit.lock().unwrap().as_mut() {
             let _ = writeln!(f, "{line}");
         }
@@ -270,6 +292,15 @@ Returns up to 50 paths, skipping dependency and build folders.",
                     "required": ["query"]
                 }
             }, {
+                "name": "remember",
+                "description": "Save one short lasting fact or preference about the user to Otto's memory \
+(e.g. 'Michael Chen is my manager; message him on Slack'). Shown to you at the start of every future task.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": { "fact": { "type": "string", "description": "One line, under 500 characters" } },
+                    "required": ["fact"]
+                }
+            }, {
                 "name": "approve",
                 "description": "Otto's permission check. Called by Claude Code, not by the model.",
                 "inputSchema": {
@@ -292,6 +323,14 @@ Returns up to 50 paths, skipping dependency and build folders.",
                 let found = find_files(&readable, query, args["name_only"] == true);
                 let text = if found.is_empty() { "No matches.".to_string() } else { found.join("\n") };
                 Ok(json!({ "content": [{ "type": "text", "text": text }] }))
+            }
+            "tools/call" if params["name"] == "remember" => {
+                let fact = params["arguments"]["fact"].as_str().unwrap_or("").split_whitespace().collect::<Vec<_>>().join(" ");
+                if fact.is_empty() || fact.len() > REMEMBER_MAX {
+                    return Err((-32602, format!("fact must be 1 to {REMEMBER_MAX} characters")));
+                }
+                remember(&crate::tasks::memory_path(), &fact).map_err(|e| (-32603, format!("could not save: {e}")))?;
+                Ok(json!({ "content": [{ "type": "text", "text": "Saved." }] }))
             }
             "tools/call" if params["name"] == "approve" => {
                 let args = &params["arguments"];
@@ -338,6 +377,23 @@ fn find_files(readable: &[PathBuf], query: &str, name_only: bool) -> Vec<String>
     out
 }
 
+/// Appends one line to the memory file. Small O_APPEND writes don't interleave.
+fn remember(path: &Path, fact: &str) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut f = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
+    writeln!(f, "- {}", clean(fact))
+}
+
+/// "mcp__claude_ai_Gmail__send_message" -> "Gmail: send message".
+fn tool_label(tool: &str) -> String {
+    let mut parts = tool.splitn(3, "__").skip(1);
+    let (server, name) = (parts.next().unwrap_or("?"), parts.next().unwrap_or("?"));
+    let server = server.strip_prefix("claude_ai_").unwrap_or(server).replace('_', " ");
+    format!("{server}: {}", name.replace('_', " "))
+}
+
 /// The policy. Pure, so it's unit tested below.
 fn classify(ctx: &TaskCtx, tool: &str, input: &Value) -> Verdict {
     let s = |k: &str| input[k].as_str().unwrap_or("").to_string();
@@ -345,6 +401,10 @@ fn classify(ctx: &TaskCtx, tool: &str, input: &Value) -> Verdict {
     match tool {
         // Otto's own read-only Spotlight search, confined to the readable folders.
         "TodoWrite" | "mcp__otto__find_files" => Verdict::Allow,
+        t if READ_ONLY_CONNECTOR_TOOLS.contains(&t) || ctx.allow.iter().any(|a| a == t) => Verdict::Allow,
+        // Saving a memory shapes every later task, so a task that read untrusted text must ask.
+        "mcp__otto__remember" if !ctx.tainted => Verdict::Allow,
+        "mcp__otto__remember" => ask("Save to Otto's memory (this task has read your files)", s("fact")),
         "Write" | "Edit" | "MultiEdit" | "NotebookEdit" => {
             let path = s("file_path");
             let p = Path::new(&path);
@@ -382,17 +442,14 @@ fn classify(ctx: &TaskCtx, tool: &str, input: &Value) -> Verdict {
                     }
                 }
             }
-            ask("Run a command", detail)
+            let summary = if cmd.contains("osascript") { "Control a Mac app" } else { "Run a command" };
+            ask(summary, detail)
         }
         "WebSearch" if !ctx.tainted => Verdict::Allow,
         "WebFetch" if !ctx.tainted => Verdict::Allow,
         "WebSearch" => ask("Search the web (this task has read your files)", s("query")),
         "WebFetch" => ask("Open a web page (this task has read your files)", s("url")),
-        t if t.starts_with("mcp__") => {
-            let mut parts = t.splitn(3, "__").skip(1);
-            let (server, name) = (parts.next().unwrap_or("?"), parts.next().unwrap_or("?"));
-            ask(&format!("Use {server}: {name}"), serde_json::to_string_pretty(input).unwrap_or_default())
-        }
+        t if t.starts_with("mcp__") => ask(&tool_label(t), serde_json::to_string_pretty(input).unwrap_or_default()),
         other => ask(&format!("Use {other}"), serde_json::to_string_pretty(input).unwrap_or_default()),
     }
 }
@@ -506,7 +563,14 @@ mod tests {
         assert!(is_ask(&classify(&c, "mcp__gmail__label_thread", &json!({}))), "unknown MCP tools ask");
         assert_eq!(classify(&c, "WebSearch", &json!({ "query": "x" })), Verdict::Allow);
         assert_eq!(classify(&c, "mcp__otto__find_files", &json!({ "query": "x" })), Verdict::Allow);
+        assert_eq!(classify(&c, "mcp__claude_ai_Gmail__search_threads", &json!({})), Verdict::Allow);
+        assert!(is_ask(&classify(&c, "mcp__claude_ai_Gmail__send_message", &json!({ "to": "m@x.com" }))), "sends ask");
+        assert!(is_ask(&classify(&c, "mcp__mem__search", &json!({}))));
+        c.allow = vec!["mcp__mem__search".into()];
+        assert_eq!(classify(&c, "mcp__mem__search", &json!({})), Verdict::Allow);
+        assert_eq!(classify(&c, "mcp__otto__remember", &json!({ "fact": "x" })), Verdict::Allow);
         c.tainted = true;
+        assert!(is_ask(&classify(&c, "mcp__otto__remember", &json!({ "fact": "x" }))), "tainted memory writes ask");
         assert!(is_ask(&classify(&c, "WebSearch", &json!({ "query": "x" }))));
         assert!(is_ask(&classify(&c, "WebFetch", &json!({ "url": "https://x" }))));
 
@@ -535,7 +599,7 @@ mod tests {
         let (c, root) = ctx();
         let (tx, rx) = mpsc::channel::<Ask>();
         let gate = Gate::start(&root.join("audit.jsonl"), move |a| tx.send(a).unwrap()).unwrap();
-        gate.register(1, &c.dir, "e2e", vec![]);
+        gate.register(1, &c.dir, "e2e", vec![], vec![]);
         let url = if answer.is_some() { gate.url(1) } else { "http://127.0.0.1:9/mcp/nope/1".into() };
         let g = gate.clone();
         let asks = std::thread::spawn(move || {
@@ -585,6 +649,17 @@ mod tests {
     fn e2e_gate_down_fails_closed() {
         let (ran, _) = e2e(None);
         assert!(!ran, "with the gate unreachable nothing may run");
+    }
+
+    #[test]
+    fn remember_appends_lines() {
+        let (_, root) = ctx();
+        let path = root.join("memory.md");
+        remember(&path, "Michael is my manager").unwrap();
+        remember(&path, "Prefers short emails").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "- Michael is my manager\n- Prefers short emails\n");
+        assert_eq!(tool_label("mcp__claude_ai_Gmail__send_message"), "Gmail: send message");
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
