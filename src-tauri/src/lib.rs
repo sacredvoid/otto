@@ -89,6 +89,15 @@ fn on_release(app: &AppHandle) {
         match result {
             Ok(text) if is_speech(&text) => {
                 println!("[otto] heard in {ms} ms: {text}");
+                // During setup the hotkey is a practice run: show what was heard, start nothing.
+                let practicing = app
+                    .get_webview_window("onboarding")
+                    .is_some_and(|w| w.is_visible().unwrap_or(false));
+                if practicing {
+                    pill(&app, "heard", Some(text), Some(ms));
+                    hide_later(&app);
+                    return;
+                }
                 match tasks::Tasks::submit(&app, &text) {
                     Ok(title) => pill(&app, "heard", Some(title), Some(ms)),
                     Err(e) => {
