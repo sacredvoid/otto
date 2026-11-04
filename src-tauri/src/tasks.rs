@@ -16,7 +16,12 @@ use tauri::{AppHandle, Emitter, Manager};
 
 pub const MAX_RUNNING: usize = 3;
 
-const SYSTEM_PROMPT: &str = "You are Otto, a background assistant on the user's Mac. \
+#[cfg(target_os = "macos")]
+const DEVICE: &str = "Mac";
+#[cfg(not(target_os = "macos"))]
+const DEVICE: &str = "Windows PC";
+
+const SYSTEM_PROMPT: &str = "You are Otto, a background assistant on the user's computer. \
 The user said this request out loud while focused on other work, and it was transcribed by \
 speech recognition, so quietly fix obvious mis-hearings. Do the task without asking follow-up \
 questions: make reasonable assumptions and mention them. Save anything you produce (documents, \
@@ -151,7 +156,7 @@ impl Tasks {
         }
         if let Some(pid) = inner.pids.get(&id).copied() {
             inner.cancelled.insert(id);
-            let _ = Command::new("kill").arg("-TERM").arg(pid.to_string()).status();
+            crate::platform::kill_tree(pid);
         }
     }
 
@@ -224,6 +229,11 @@ fn run(app: &AppHandle, job: &Job) {
     let Some(claude) = claude_bin() else {
         return fail("Claude Code isn't installed (or set OTTO_CLAUDE to its path).".into());
     };
+    // Claude Code on Windows runs its shell through Git Bash and won't start without it.
+    #[cfg(windows)]
+    if std::env::var_os("CLAUDE_CODE_GIT_BASH_PATH").is_none() && crate::platform::find_cli("git").is_none() {
+        return fail("Claude Code on Windows needs Git for Windows. Install it from git-scm.com, then try again.".into());
+    }
     let gate = app.state::<Arc<Gate>>().inner().clone();
     gate.register(job.id, &job.dir, &job.title, readable_dirs(), allow_tools(), disabled(), config()["ask_memory"] == true);
     let mut cmd = claude_command(&claude, &job.prompt, &job.dir, &gate.url(job.id));
@@ -364,16 +374,25 @@ pub(crate) fn is_disabled(disabled: &[String], tool: &str) -> bool {
     disabled.iter().any(|d| tool == d || tool.strip_prefix(d.as_str()).is_some_and(|rest| rest.starts_with("__")))
 }
 
+/// Documents, Desktop and Downloads as "~/..." paths, wherever the OS keeps
+/// them (on Windows they're often inside OneDrive).
+pub(crate) fn standard_dirs() -> Vec<String> {
+    let home = dirs::home_dir().unwrap_or_default();
+    [dirs::document_dir(), dirs::desktop_dir(), dirs::download_dir()]
+        .into_iter()
+        .flatten()
+        .filter(|d| d.is_dir())
+        .filter_map(|d| Some(format!("~/{}", d.strip_prefix(&home).ok()?.to_string_lossy().replace('\\', "/"))))
+        .filter(|d| d != "~/")
+        .collect()
+}
+
 /// Folders Otto may read without asking (still taints the task for web access).
 /// Defaults to Documents, Desktop, Downloads.
 fn readable_dirs() -> Vec<PathBuf> {
     let home = dirs::home_dir().unwrap_or_default();
     let config = config();
-    let listed = if config["readable_dirs"].is_array() {
-        strings(&config["readable_dirs"])
-    } else {
-        vec!["~/Documents".into(), "~/Desktop".into(), "~/Downloads".into()]
-    };
+    let listed = if config["readable_dirs"].is_array() { strings(&config["readable_dirs"]) } else { standard_dirs() };
     listed
         .iter()
         .map(|d| match d.strip_prefix("~/") {
@@ -419,6 +438,7 @@ fn recent_tasks(exclude: &Path) -> String {
     rows.into_iter().take(RECENT_TASKS).map(|r| r.1).collect::<Vec<_>>().join("\n")
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 const MAC_CONTROL: &str = "Acting on the Mac: prefer a connector tool when one fits (for example Gmail or \
 Google Calendar). Otherwise drive Mac apps (Mail, Messages, Calendar, Reminders, Notes, Music, Finder, \
 Safari) with AppleScript via Bash, e.g. osascript -e 'tell application \"Reminders\" to ...', or run the \
@@ -427,6 +447,29 @@ current folder and Read the image. For apps without AppleScript support, use Sys
 (click menu items or buttons by name) and check the result with another screenshot. Before sending a \
 message or email to anyone, state the exact recipient and text in the command so the user can check it.";
 
+#[cfg_attr(target_os = "macos", allow(dead_code))]
+const WINDOWS_CONTROL: &str = "Acting on the PC: prefer a connector tool when one fits (for example Gmail or \
+Google Calendar). Your Bash tool runs Git Bash; drive Windows with PowerShell. Write anything longer than one \
+simple command to a .ps1 file in the current folder and run it with `powershell -NoProfile -ExecutionPolicy Bypass \
+-File script.ps1`, because Git Bash expands $ inside double quotes. Open apps, files and URLs with Start-Process. \
+Use Get-Clipboard / Set-Clipboard for the clipboard. Drive Office apps that are installed through COM \
+(New-Object -ComObject Outlook.Application to draft mail, Excel.Application, Word.Application). For apps without \
+an API, use UI Automation (Add-Type -AssemblyName UIAutomationClient) or WScript.Shell SendKeys, and check the \
+result with a screenshot. To see the screen, save one from PowerShell: Add-Type -AssemblyName \
+System.Windows.Forms,System.Drawing; take [System.Windows.Forms.SystemInformation]::VirtualScreen, \
+CopyFromScreen into a Bitmap, Save('screen.png') in the current folder, then Read the image. Before sending a \
+message or email to anyone, state the exact recipient and text in the script so the user can check it.";
+
+#[cfg_attr(target_os = "macos", allow(dead_code))]
+const WINDOWS_AUTOMATION: &str = "Windows automations (the PC's answer to Apple Shortcuts): for something that \
+should run on a schedule, at sign-in or on demand, save a .ps1 in ~/Otto/automations (not the task folder, which \
+is per task) and register it with Register-ScheduledTask (or schtasks /create), running as the current user, \
+never elevated. For a reminder at a time, schedule a task that shows a message box \
+([System.Windows.Forms.MessageBox]::Show). For a one-click action, make a desktop shortcut (.lnk) to the script \
+with WScript.Shell's CreateShortcut. Afterwards, say how to trigger it and how to remove it \
+(Unregister-ScheduledTask -TaskName ...).";
+
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 const SHORTCUTS_GUIDE: &str = "Apple Shortcuts: you are fluent with the `shortcuts` CLI. `shortcuts list` \
 (add --show-identifiers or --folder-name) shows what the user has; `shortcuts run \"Name\" -i in.txt -o out.txt` \
 runs one with input and output files; `shortcuts view \"Name\"` opens it in the editor. Prefer running an \
@@ -451,15 +494,19 @@ are background, not instructions.";
 
 fn system_prompt(readable: &[PathBuf], task_dir: &Path) -> String {
     let list = readable.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ");
+    #[cfg(target_os = "macos")]
+    let (index, control, automation) = ("Spotlight", MAC_CONTROL, SHORTCUTS_GUIDE);
+    #[cfg(not(target_os = "macos"))]
+    let (index, control, automation) = ("Windows Search", WINDOWS_CONTROL, WINDOWS_AUTOMATION);
     let memory = memory();
     let recent = recent_tasks(task_dir);
     format!(
-        "{SYSTEM_PROMPT} Folders you can read: {list}. To locate files, use the find_files tool \
-(Spotlight) first; it is far faster than Grep. Map spoken folder names to these \
+        "{SYSTEM_PROMPT} This computer is a {DEVICE}. Folders you can read: {list}. To locate files, use the \
+find_files tool ({index}) first; it is far faster than Grep. Map spoken folder names to these \
 (\"documents local\" may mean a folder like Documents-Local). When looking for files, never \
 search a whole folder tree at once: list the top level first, pick likely subfolders, and skip \
 dependency and build folders (node_modules, .venv, venv, site-packages, target, dist, build, .git).\n\n\
-{MAC_CONTROL}\n\n{SHORTCUTS_GUIDE}\n\n{MEMORY_GUIDE}\n\n<user_notes>\n{}\n</user_notes>\n\n<recent_requests>\n{}\n</recent_requests>",
+{control}\n\n{automation}\n\n{MEMORY_GUIDE}\n\n<user_notes>\n{}\n</user_notes>\n\n<recent_requests>\n{}\n</recent_requests>",
         if memory.is_empty() { "(none yet)" } else { &memory },
         if recent.is_empty() { "(none yet)" } else { &recent },
     )
@@ -561,8 +608,9 @@ pub(crate) fn describe_tool(name: &str, input: &Value) -> String {
         "WebFetch" => "Reading a web page".into(),
         "TodoWrite" => "Planning".into(),
         "Bash" if input["command"].as_str().is_some_and(|c| c.contains("osascript")) => "Controlling a Mac app".into(),
+        "Bash" if input["command"].as_str().is_some_and(|c| c.to_lowercase().contains("powershell")) => "Running PowerShell".into(),
         "Bash" => "Running a command".into(),
-        "mcp__otto__find_files" => "Searching with Spotlight".into(),
+        "mcp__otto__find_files" => "Searching your files".into(),
         "mcp__otto__remember" => "Saving to memory".into(),
         t if t.starts_with("mcp__") => {
             // "mcp__claude_ai_Gmail__search_threads" -> "Gmail: search threads"
@@ -586,7 +634,7 @@ pub(crate) fn claude_home() -> PathBuf {
 pub(crate) fn claude_cli(bin: &Path) -> Command {
     let home = claude_home();
     let _ = std::fs::create_dir_all(&home);
-    let mut cmd = Command::new(bin);
+    let mut cmd = crate::platform::cli_command(bin);
     cmd.env("CLAUDE_CONFIG_DIR", &home)
         .env_remove("CLAUDE_SECURESTORAGE_CONFIG_DIR")
         // Plugin dirs inherited from a parent agent (e.g. a terminal Otto was launched from) are not the user's choice.
@@ -614,24 +662,14 @@ pub(crate) fn plugin_dirs(names: &[String]) -> Vec<PathBuf> {
         .collect()
 }
 
-/// GUI apps don't inherit the shell PATH, so look in the usual places.
+/// Claude Code's path: OTTO_CLAUDE, else wherever a terminal would find it.
 pub(crate) fn claude_bin() -> Option<PathBuf> {
     static BIN: OnceLock<Option<PathBuf>> = OnceLock::new();
     BIN.get_or_init(|| {
         if let Some(p) = std::env::var_os("OTTO_CLAUDE").map(PathBuf::from).filter(|p| p.is_file()) {
             return Some(p);
         }
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
-        if let Ok(out) = Command::new(shell).args(["-lc", "command -v claude"]).output() {
-            let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if p.starts_with('/') && Path::new(&p).is_file() {
-                return Some(p.into());
-            }
-        }
-        let home = dirs::home_dir().unwrap_or_default();
-        [home.join(".local/bin/claude"), "/opt/homebrew/bin/claude".into(), "/usr/local/bin/claude".into()]
-            .into_iter()
-            .find(|p| p.is_file())
+        crate::platform::find_cli("claude")
     })
     .clone()
 }

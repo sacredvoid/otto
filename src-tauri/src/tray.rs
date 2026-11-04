@@ -9,10 +9,15 @@ use tauri::{AppHandle, Wry};
 static UPDATE_URL: OnceLock<String> = OnceLock::new();
 static UPDATE_VERSION: OnceLock<String> = OnceLock::new();
 
+// A black template glyph macOS tints for the menu bar; Windows taskbars are often
+// dark, so it gets the colored app icon.
+#[cfg(target_os = "macos")]
 const ICON: &[u8] = include_bytes!("../icons/tray/pebbleTemplate@2x.png");
+#[cfg(not(target_os = "macos"))]
+const ICON: &[u8] = include_bytes!("../icons/32x32.png");
 
 fn menu(app: &AppHandle, update: Option<&str>) -> tauri::Result<Menu<Wry>> {
-    let hint = MenuItem::with_id(app, "hint", "Otto is listening: hold Ctrl+Option+Space", false, None::<&str>)?;
+    let hint = MenuItem::with_id(app, "hint", format!("Otto is listening: hold {}", crate::platform::HOTKEY_LABEL), false, None::<&str>)?;
     let home = MenuItem::with_id(app, "home", "Open Otto\u{2026}", true, None::<&str>)?;
     let history = MenuItem::with_id(app, "history", "History\u{2026}", true, None::<&str>)?;
     let login = CheckMenuItem::with_id(app, "login", "Open at Login", true, crate::power::login_enabled(), None::<&str>)?;
@@ -39,14 +44,15 @@ pub fn show_update(app: &AppHandle, version: &str, url: &str) {
 pub fn start(app: &AppHandle) -> tauri::Result<()> {
     TrayIconBuilder::with_id("otto")
         .icon(Image::from_bytes(ICON)?)
-        .icon_as_template(true)
+        .icon_as_template(cfg!(target_os = "macos"))
+        .tooltip("Otto")
         .menu(&menu(app, None)?)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "home" => crate::history::show(app, "home"),
             "history" => crate::history::show(app, "history"),
             "update" => {
                 if let Some(url) = UPDATE_URL.get().filter(|u| u.starts_with(crate::updates::RELEASES)) {
-                    let _ = std::process::Command::new("open").arg(url).spawn();
+                    let _ = crate::platform::open(url.as_ref());
                 }
             }
             "login" => {

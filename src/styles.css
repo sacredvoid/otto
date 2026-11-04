@@ -157,3 +157,22 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .pill { transition: none; animation: none !important; }
 }
+
+/* Windows: no native glass, so a near-solid island that drops in its own color. */
+html.windows .pill {
+  background: rgba(252, 253, 253, 0.97);
+  border-color: var(--line);
+}
+html.windows .pill[data-state="heard"] {
+  background: #e3f4ea;
+}
+html.windows .pill[data-state="listening"] {
+  animation-name: drip-in-plain;
+}
+@keyframes drip-in-plain {
+  0% { opacity: 0.6; transform: translateY(-100%) scale(0.35, 0.6); }
+  35% { opacity: 1; transform: translateY(6%) scale(0.7, 1.18); }
+  60% { opacity: 1; transform: translateY(0) scale(1.08, 0.9); }
+  80% { opacity: 1; transform: scale(0.97, 1.03); }
+  100% { opacity: 1; transform: none; }
+}
