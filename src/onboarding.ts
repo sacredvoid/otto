@@ -123,31 +123,37 @@ function renderCaps() {
   box.replaceChildren(...groups);
 }
 
+// Bundled so setup works offline; Vite rewrites these URLs at build time.
+const LOGOS = {
+  claude: new URL("./logos/claude.png", import.meta.url).href,
+  codex: new URL("./logos/openai.png", import.meta.url).href,
+  gemini: new URL("./logos/gemini.svg", import.meta.url).href,
+  ollama: new URL("./logos/ollama.png", import.meta.url).href,
+};
+
 function renderAis(d: Detected) {
-  const rows: [string, boolean, boolean][] = [
-    ["Claude Code", d.claude, true],
-    ["Codex", d.codex, false],
-    ["Gemini CLI", d.gemini, false],
-    ["Ollama", d.ollama, false],
+  const rows: [keyof typeof LOGOS, string, boolean, boolean][] = [
+    ["claude", "Claude Code", d.claude, true],
+    ["codex", "Codex", d.codex, false],
+    ["gemini", "Gemini CLI", d.gemini, false],
+    ["ollama", "Ollama", d.ollama, false],
   ];
-  const box = $("ais");
-  box.replaceChildren();
-  rows.forEach(([name, found, supported], i) => {
-    const row = el("div", "ai");
-    if (!supported) row.dataset.off = "";
-    const id = `ai-${i}`;
-    const radio = el("input");
-    radio.type = "radio";
-    radio.name = "ai";
-    radio.id = id;
-    radio.disabled = !supported;
-    radio.checked = supported && found;
-    const label = el("label", "", name);
-    label.htmlFor = id;
-    const tag = el("span", "tag", !supported ? (found ? "Found, coming soon" : "Coming soon") : found ? "Found" : "Not found");
-    row.append(radio, label, tag);
-    box.append(row);
-  });
+  $("ais").replaceChildren(
+    ...rows.map(([key, name, found, supported]) => {
+      const tile = el("button", "ai-tile");
+      tile.type = "button";
+      tile.setAttribute("role", "radio");
+      tile.setAttribute("aria-checked", String(supported && found));
+      tile.disabled = !supported;
+      const img = el("img");
+      img.src = LOGOS[key];
+      img.alt = "";
+      const status = supported ? (found ? "Installed" : "Not installed") : found ? "Installed, coming soon" : "Coming soon";
+      tile.append(img, el("span", "ai-name", name), el("span", "ai-status", status));
+      tile.title = supported ? name : `${name} support is coming soon`;
+      return tile;
+    }),
+  );
 }
 
 function button(text: string, cls: string, onClick: () => void) {
