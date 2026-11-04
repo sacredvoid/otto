@@ -2,7 +2,7 @@
 
 Hold a hotkey, say what you want, keep working. Otto does it in the background with tools (shell, files, APIs, MCP), never by taking over your screen, and reports back by notification or voice.
 
-**Who it's for:** one person on their own laptop, juggling personal and work tasks. You're focused on thing A, and thing B pops into your head ("make a 5-slide deck on Q3 hiring", "find that lease PDF and summarize the pet clause", "draft a reply to Priya"). You say it once and go back to A. Otto works on B in the background and hands you the result when it's done. It's an assistant you delegate to, not a voice command line.
+**Who it's for:** one person on their own laptop, juggling personal and work tasks. You're focused on thing A, and thing B pops into your head ("make a 5-slide deck on Q3 hiring", "find that lease PDF and summarize the pet clause", "draft a reply to Jordan"). You say it once and go back to A. Otto works on B in the background and hands you the result when it's done. It's an assistant you delegate to, not a voice command line.
 
 Status: design locked 2026-11-03. Implementation started.
 
