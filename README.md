@@ -24,6 +24,19 @@ Hold **Ctrl + Option + Space**, say what you need, let go, and keep working. Ott
 | Mac control | Drives Mail, Messages, Reminders, Notes, Finder and other apps through AppleScript and Shortcuts, and can take a screenshot to check its work. Every action is approved by you. |
 | History | A window listing everything you've asked, with the answer, the steps taken, the approvals, and the files produced. |
 
+## A look inside
+
+**History** shows every request as a trace: what you said, each step Otto took with its approval, the output, and the result. Follow-ups stay in the same thread.
+
+<img src="docs/screenshots/history.png" alt="History window: a request to reply to Priya, the Gmail search that ran automatically, the send you allowed, the result, and a follow-up asking about Zoom." width="100%">
+
+<table>
+  <tr>
+    <td width="42%" valign="top"><b>Cards</b> slide in at the top right: anything risky waits for <i>Allow</i>, and finished work lands as a short summary.<br><br><img src="docs/screenshots/cards.png" alt="Three cards: a finished calendar summary, a Gmail send waiting for Allow with the full message shown, and a task still reading a document." width="100%"></td>
+    <td width="58%" valign="top"><b>Setup</b> lists everything Otto can use, including the connectors on your Claude account, and lets you switch any of it off.<br><br><img src="docs/screenshots/setup.png" alt="Setup screen listing built-in tools, Gmail, Google Calendar and Google Drive connectors, and the claude-mem plugin, each with a switch." width="100%"></td>
+  </tr>
+</table>
+
 ## How it works
 
 ```mermaid
