@@ -121,6 +121,10 @@ DESIGN.md       the design doc and build plan
 - [x] Downloadable DMG, built by CI; tagged versions become releases
 - [ ] Notarized build with auto-update
 
+## Contributing
+
+Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, and the rules around the permission gate.
+
 ## Status
 
 Early preview. I use it daily, it has rough edges, and it only runs on Apple Silicon for now.
