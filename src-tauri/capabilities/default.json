@@ -2,6 +2,6 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Otto's own windows: listen to Otto events and call Otto's commands only",
-  "windows": ["overlay", "toasts", "chip"],
+  "windows": ["overlay", "toasts", "chip", "onboarding"],
   "permissions": ["core:event:default"]
 }

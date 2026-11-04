@@ -56,6 +56,17 @@
         "shadow": false,
         "focus": false,
         "visible": false
+      },
+      {
+        "label": "onboarding",
+        "title": "Welcome to Otto",
+        "url": "onboarding.html",
+        "width": 760,
+        "height": 540,
+        "center": true,
+        "resizable": false,
+        "maximizable": false,
+        "visible": false
       }
     ],
     "security": {

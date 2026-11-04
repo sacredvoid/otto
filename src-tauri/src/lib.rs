@@ -1,5 +1,6 @@
 mod audio;
 mod gate;
+mod onboarding;
 mod overlay;
 mod stt;
 mod tasks;
@@ -173,7 +174,18 @@ pub fn run() {
     tauri::Builder::default()
         .manage(Otto::default())
         .manage(tasks::Tasks::default())
-        .invoke_handler(tauri::generate_handler![task_details, open_task_file, show_task_folder, cancel_task, answer_approval, set_toasts_height, set_chip_size])
+        .invoke_handler(tauri::generate_handler![task_details, open_task_file, show_task_folder, cancel_task, answer_approval, set_toasts_height, set_chip_size,
+            onboarding::onboarding_info, onboarding::onboarding_detect, onboarding::mic_status, onboarding::request_mic,
+            onboarding::open_settings, onboarding::finish_onboarding])
+        // The onboarding window is reopened later from the tray, so closing only hides it.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "onboarding" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcuts([HOTKEY])
@@ -191,6 +203,10 @@ pub fn run() {
             overlay::place_toasts(app.handle());
             overlay::place_chip(app.handle());
             tray::start(app.handle())?;
+            let handle = app.handle().clone();
+            tauri::Listener::listen_any(app.handle(), "otto://show-onboarding", move |_| {
+                onboarding::show_onboarding(&handle);
+            });
 
             let asks = app.handle().clone();
             let audit = dirs::home_dir().unwrap_or_default().join("Otto/audit.jsonl");
@@ -209,6 +225,9 @@ pub fn run() {
                 }
                 let _ = handle.state::<Otto>().stt.set(loaded);
             });
+            if !onboarding::is_onboarded() {
+                onboarding::show_onboarding(app.handle());
+            }
             println!("[otto] hold Ctrl+Option+Space to talk");
             Ok(())
         })

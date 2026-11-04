@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Welcome to Otto</title>
+    <link rel="stylesheet" href="/src/onboarding.css" />
+    <link rel="stylesheet" href="/src/mascot.css" />
+    <script type="module" src="/src/onboarding.ts"></script>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <svg width="24" height="24" viewBox="0 0 100 100" aria-hidden="true">
+          <path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3" />
+          <path d="M34 46 Q39 40 44 46 M56 46 Q61 40 66 46" fill="none" stroke="#2F6F62" stroke-width="6" stroke-linecap="round" />
+          <path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round" />
+        </svg>
+        <span>Otto</span>
+      </div>
+      <span id="count" class="muted" aria-live="polite">1 / 5</span>
+    </header>
+
+    <main>
+      <section data-step="1" class="center">
+        <svg width="96" height="96" viewBox="0 0 100 100" aria-hidden="true">
+          <g class="m breathe">
+            <path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#CFE6F3" />
+            <path d="M34 46 Q39 40 44 46 M56 46 Q61 40 66 46" fill="none" stroke="#2F6F62" stroke-width="4" stroke-linecap="round" />
+            <path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="5" stroke-linejoin="round" />
+            <circle cx="50" cy="81" r="3.5" fill="#2F6F62" />
+          </g>
+        </svg>
+        <h1 class="big" tabindex="-1">Hi, I'm Otto.</h1>
+        <p class="lead">Hold a key, say what just popped into your head, and get back to work. I'll take care of it in the background.</p>
+        <p class="muted small">I never touch your screen, and I ask before sending or deleting anything.</p>
+      </section>
+
+      <section data-step="2" hidden>
+        <h1 tabindex="-1">A few permissions</h1>
+        <p class="muted">macOS asks you to confirm each one. Change them anytime in Settings.</p>
+        <div class="row">
+          <div class="grow"><span class="name">Microphone</span><span class="muted small">Only while you hold the hotkey.</span></div>
+          <span id="mic-ok" class="pill-ok" hidden>Allowed</span>
+          <button id="mic-btn" type="button" class="ghost">Allow</button>
+        </div>
+        <div class="row">
+          <div class="grow"><span class="name">Notifications</span><span class="muted small">A backup for when the overlay is hidden.</span></div>
+          <button id="notif-btn" type="button" class="ghost">Open settings</button>
+        </div>
+        <fieldset class="row folders">
+          <legend class="name">Folders <span class="muted small">optional</span></legend>
+          <p class="muted small">Otto can read these without asking. Pick the ones you are happy with.</p>
+          <div id="folders"></div>
+        </fieldset>
+      </section>
+
+      <section data-step="3" hidden>
+        <h1 tabindex="-1">Pick your AI</h1>
+        <p class="muted">Otto hands your request to a coding assistant on this Mac. Claude Code is the only one wired up so far.</p>
+        <div id="ais"></div>
+        <!-- TODO: API key field (stored in Keychain) and a Test button. -->
+      </section>
+
+      <section data-step="4" hidden class="center">
+        <h1 tabindex="-1">Try it</h1>
+        <p class="lead">Hold the keys and say "hi Otto". Let go when you're done.</p>
+        <div class="keys" aria-label="Control, Option, Space">
+          <kbd>&#8963;</kbd><kbd>&#8997;</kbd><kbd class="wide">space</kbd>
+        </div>
+        <p id="heard" class="heard" role="status" hidden></p>
+        <p class="muted small">You can skip this and try it later.</p>
+      </section>
+
+      <section data-step="5" hidden class="center">
+        <svg width="72" height="72" viewBox="0 0 100 100" aria-hidden="true">
+          <g class="m hop">
+            <path d="M50 12 C74 10 88 26 86 48 C84 68 68 78 48 78 C26 78 12 64 14 44 C16 24 30 13 50 12 Z" fill="#BFE5D2" />
+            <path d="M33 47 Q39 39 45 47 M55 47 Q61 39 67 47" fill="none" stroke="#2F6F62" stroke-width="5" stroke-linecap="round" />
+            <path d="M38 76 L48 81 L38 86 Z M62 76 L52 81 L62 86 Z" fill="#8CC9B2" stroke="#8CC9B2" stroke-width="6" stroke-linejoin="round" />
+          </g>
+        </svg>
+        <h1 tabindex="-1">You're ready</h1>
+        <p id="ready-folders" class="lead"></p>
+        <p class="muted">Otto asks before it sends, deletes or runs commands.</p>
+        <p id="error" class="error" role="alert" hidden></p>
+      </section>
+    </main>
+
+    <footer>
+      <div class="foot-left">
+        <button id="back" type="button" class="quiet">Back</button>
+        <span id="model" class="muted small"></span>
+      </div>
+      <button id="next" type="button" class="solid">Get started</button>
+    </footer>
+  </body>
+</html>
