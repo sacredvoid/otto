@@ -57,7 +57,10 @@ Otto has no model of its own. Each request runs as a `claude -p` task in restric
 
 1. Install [Claude Code](https://docs.claude.com/claude-code) and log in once (`claude` in a terminal).
 2. [Download Otto](https://github.com/sacredvoid/otto/releases/latest), open the DMG, and drag Otto to Applications.
-3. Open Otto. macOS will block it the first time because it isn't notarized yet: go to System Settings, Privacy & Security, and click **Open Anyway**.
+3. Open Otto. macOS blocks it the first time because it isn't notarized yet. Click **Done** (not Move to Trash), then go to System Settings, Privacy & Security, scroll down, and click **Open Anyway**. Or run this once in Terminal:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Otto.app
+   ```
 4. The setup window walks you through microphone access and which folders Otto may read.
 
 The speech model ships inside the app, so there's nothing else to download.

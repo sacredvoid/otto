@@ -76,4 +76,4 @@ jobs:
           cp "$dmg" "Otto-${TAG#v}-AppleSilicon.dmg"
           gh release create "$TAG" "Otto-${TAG#v}-AppleSilicon.dmg" \
             --title "Otto ${TAG#v}" --generate-notes \
-            --notes "Apple Silicon, macOS 13+. Needs Claude Code installed and logged in. Open the DMG, drag Otto to Applications, then on first launch use System Settings > Privacy & Security > Open Anyway (this build isn't notarized yet)."
+            --notes "Apple Silicon, macOS 13+. Needs Claude Code installed and logged in. Open the DMG, drag Otto to Applications, then on first launch click Done (not Move to Trash) and use System Settings > Privacy & Security > Open Anyway, or run: xattr -dr com.apple.quarantine /Applications/Otto.app (this build isn't notarized yet)."
