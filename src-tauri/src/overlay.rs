@@ -61,6 +61,46 @@ pub fn set_toasts_height(app: &AppHandle, height: f64) {
     let _ = win.show();
 }
 
+const CHIP_MARGIN: f64 = 16.0;
+
+/// Bottom-right chip: a non-activating panel that takes clicks but never focus.
+pub fn place_chip(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    if let Some(win) = app.get_webview_window("chip") {
+        mac::make_panel(&win);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
+/// The webview reports its content size; 0 means nothing to show, so hide.
+/// The bottom-right corner stays put, so the chip grows up and to the left.
+pub fn set_chip_size(app: &AppHandle, width: f64, height: f64) {
+    let Some(win) = app.get_webview_window("chip") else { return };
+    if !(width >= 1.0 && height >= 1.0) {
+        let _ = win.hide();
+        return;
+    }
+    let (width, height) = (width.min(600.0), height.min(720.0));
+    let _ = win.set_size(tauri::LogicalSize::new(width, height));
+    if let Ok(Some(m)) = win.primary_monitor() {
+        let s = m.scale_factor();
+        let size = m.size().to_logical::<f64>(s);
+        let pos = m.position().to_logical::<f64>(s);
+        let _ = win.set_position(LogicalPosition::new(
+            pos.x + size.width - width - CHIP_MARGIN,
+            pos.y + size.height - height - CHIP_MARGIN,
+        ));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let w = win.clone();
+        let _ = app.run_on_main_thread(move || mac::order_front(&w));
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = win.show();
+}
+
 #[cfg(target_os = "macos")]
 mod mac {
     use objc2::msg_send;

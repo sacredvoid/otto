@@ -41,6 +41,21 @@
         "shadow": false,
         "focus": false,
         "visible": false
+      },
+      {
+        "label": "chip",
+        "title": "Otto chip",
+        "url": "chip.html",
+        "width": 200,
+        "height": 60,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "focus": false,
+        "visible": false
       }
     ],
     "security": {
