@@ -60,34 +60,28 @@ fn stage_windows_libs() {
     }
 
     // transcribe.dll and ggml*.dll import these three; without them Otto can't start on a PC
-    // lacking the VC++ redistributable. vcomp140 (OpenMP) is unused while OpenMP is off.
+    // lacking the VC++ redistributable. OpenMP is off, so nothing imports vcomp140.
     const REQUIRED: [&str; 3] = ["msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll"];
-    const OPTIONAL: [&str; 1] = ["vcomp140.dll"];
     let release = env::var("PROFILE").as_deref() == Ok("release");
     match vc_redist_dir() {
         Some(redist) => {
-            let wanted = |n: &str| {
-                let n = n.to_ascii_lowercase();
-                REQUIRED.contains(&n.as_str()) || OPTIONAL.contains(&n.as_str())
-            };
+            let wanted = |n: &str| REQUIRED.contains(&n.to_ascii_lowercase().as_str());
             for sub in fs::read_dir(&redist).into_iter().flatten().flatten() {
-                // Microsoft.VC143.CRT and Microsoft.VC143.OpenMP
+                // Microsoft.VC143.CRT
                 let p = sub.path();
                 if p.is_dir() {
                     copy_dlls(&p, &[&dest], wanted);
                 }
             }
-            for (names, required) in [(&REQUIRED[..], true), (&OPTIONAL[..], false)] {
-                for n in names {
-                    if dest.join(n).is_file() {
-                        continue;
-                    }
-                    let msg = format!("{n} not found in {}", redist.display());
-                    if required && release {
-                        panic!("{msg}; the installer would not start without the VC++ redistributable");
-                    }
-                    println!("cargo:warning={msg}");
+            for n in REQUIRED {
+                if dest.join(n).is_file() {
+                    continue;
                 }
+                let msg = format!("{n} not found in {}", redist.display());
+                if release {
+                    panic!("{msg}; the installer would not start without the VC++ redistributable");
+                }
+                println!("cargo:warning={msg}");
             }
         }
         None => {

@@ -24,4 +24,4 @@ Otto bundles the models and libraries below. Each keeps its own license.
 
 ## Microsoft Visual C++ runtime (Windows installer only)
 
-The Windows installer carries `msvcp140.dll`, `vcruntime140.dll`, `vcruntime140_1.dll` and `vcomp140.dll` from the Visual C++ Redistributable, which Microsoft lets developers ship with their apps under the Visual Studio license terms.
+The Windows installer carries `msvcp140.dll`, `vcruntime140.dll` and `vcruntime140_1.dll` from the Visual C++ Redistributable, which Microsoft lets developers ship with their apps under the Visual Studio license terms.
