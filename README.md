@@ -18,7 +18,7 @@ Hold **Ctrl + Option + Space** (**Ctrl + Alt + Space** on Windows), say what you
 
 | Feature | How it works |
 |---|---|
-| Hold to talk | A global hotkey. Whisper runs on your Mac (Metal), so your audio never leaves it. |
+| Hold to talk | A global hotkey. NVIDIA's Parakeet speech model runs on your computer (the GPU on a Mac, the GPU or CPU on Windows), so your audio never leaves it. |
 | Background tasks | Up to three tasks at once, each in its own folder under `~/Otto/tasks`. Files a task produces stay there. |
 | Permission gate | Every risky action (running a command, writing outside the task folder, sending email, going online after reading your files) waits for an *Allow* click. Each decision is logged to `~/Otto/audit.jsonl`. |
 | Your connectors | Uses the Gmail, Google Calendar and other claude.ai connectors your Claude account already has. Read-only calls run on their own. Sending, creating and deleting always ask first. |
@@ -71,7 +71,7 @@ Say these out loud. Anything that sends, changes, or runs something waits for yo
 
 ```mermaid
 flowchart LR
-  A["Hold hotkey, talk"] --> B["Whisper<br/>(on your Mac)"]
+  A["Hold hotkey, talk"] --> B["Parakeet<br/>(on your computer)"]
   B --> C["Claude Code task<br/>(restricted mode)"]
   C -->|"wants to act"| G{"Otto's gate"}
   G -->|"safe"| R["Runs"]
@@ -103,7 +103,7 @@ Otto has no model of its own. Each request runs as a `claude -p` task in restric
 
 What's different on Windows: there's no notch, so the island drops from the top of the screen, and the cards are solid instead of glass. Otto drives apps with PowerShell instead of AppleScript, uses Windows Search to find files, and sets up automations as Scheduled Tasks instead of Shortcuts. It's new, so please [file an issue](https://github.com/sacredvoid/otto/issues) when something's off.
 
-The speech model ships inside the app, so there's nothing else to download.
+The speech model ships inside the app, so there's nothing else to download. On Windows, Otto uses your graphics card through Vulkan when it beats the CPU, and the CPU otherwise. At launch it times one short run on each and keeps the faster one. A PC without a Vulkan driver runs on the CPU.
 
 **Updates:** Otto checks GitHub once a day. When a new version is out, the menu bar (or tray) menu shows *Update available*, which opens the download page. Turn it off with `"check_updates": false` in `~/Otto/config.json`.
 
@@ -119,7 +119,7 @@ npm run tauri dev      # run it
 npm run tauri build    # make Otto.app and the DMG (fetches the speech model first)
 ```
 
-On Windows, also install the [Visual Studio C++ build tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/), CMake and LLVM (for the speech engine), and fetch the model yourself first: `sh scripts/fetch-model.sh` in Git Bash. `npm run tauri build` then makes an NSIS installer.
+On Windows, also install the [Visual Studio C++ build tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/), CMake and the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home#windows) (for the speech engine), and fetch the models yourself first: `sh scripts/fetch-model.sh` in Git Bash. `npm run tauri build` then makes an NSIS installer.
 </details>
 
 ## Follow-ups
@@ -138,9 +138,13 @@ Everything lives in `~/Otto/config.json`. Every key is optional.
   "allow_tools": ["mcp__plugin_claude-mem_mcp-search__search"],          // read-only tools that skip the prompt
   "model": "sonnet",                                       // optional: a faster model for quicker answers
   "ask_memory": true,                                      // ask before each memory save (default: automatic)
-  "launch_at_login": false                                 // don't open at login (the menu bar toggle sets this)
+  "launch_at_login": false,                                // don't open at login (the menu bar toggle sets this)
+  "speech_model": "ggml-base.en.bin",                      // optional: another speech model (default: Parakeet 0.6B)
+  "speech_device": "cpu"                                   // optional: "auto" (default), "cpu", or part of a GPU name such as "RTX"
 }
 ```
+
+To use a different speech model, put its file in Otto's models folder (`~/Library/Application Support/app.otto.desktop/models/` on a Mac, `%APPDATA%\app.otto.desktop\models\` on Windows) and set `"speech_model"` to its file name. Otto accepts Parakeet and Whisper files in GGUF or ggml format. `ggml-base.en.bin` brings back the Whisper model Otto used before.
 
 To edit what Otto remembers about you, open `~/Otto/memory.md`. It's one fact per line, and Otto adds lines when you tell it something worth keeping.
 
@@ -149,7 +153,10 @@ To edit what Otto remembers about you, open `~/Otto/memory.md`. It's one fact pe
 ```
 src-tauri/src/
   lib.rs        hotkey, recording, app wiring
-  stt.rs        whisper.cpp transcription
+  stt.rs        speech-to-text through transcribe.cpp (Parakeet)
+  device.rs     picks the GPU or CPU for speech
+  vad.rs        Silero voice detection, skips silent taps
+  speech_config.rs  speech_model and speech_device settings
   tasks.rs      task queue, claude CLI invocation, system prompt, memory
   gate.rs       MCP server + permission policy + audit log
   history.rs    reads past tasks for the History window
@@ -180,3 +187,7 @@ Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md
 ## Status
 
 Early preview. I use it daily, it has rough edges. On a Mac it needs Apple Silicon; the Windows build is new and experimental.
+
+## Credits
+
+Otto transcribes speech with [NVIDIA Parakeet TDT 0.6B v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2), licensed under [CC-BY-4.0](https://creativecommons.org/licenses/by/4.0/), through [transcribe.cpp](https://github.com/handy-computer/transcribe.cpp) (MIT). Otto ships a Q8_0 GGUF conversion of the model from [handy-computer](https://huggingface.co/handy-computer). It detects silence with [Silero VAD](https://github.com/snakers4/silero-vad) (MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
