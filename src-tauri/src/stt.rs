@@ -73,13 +73,33 @@ fn init_backends_inner() -> Result<(), String> {
     // Windows ships the backend modules next to Otto.exe (and build.rs stages them next to
     // dev builds and test binaries), so point the loader there explicitly.
     #[cfg(windows)]
-    if let Some(dir) = std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)) {
-        match transcribe_cpp::init_backends(&dir) {
-            Ok(()) => return Ok(()),
-            Err(e) => eprintln!("[otto] no speech backends in {} ({e}); trying next to transcribe.dll", dir.display()),
+    {
+        quiet_dll_errors();
+        if let Some(dir) = std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)) {
+            return transcribe_cpp::init_backends(&dir).map_err(|e| format!("{e} (looked in {})", dir.display()));
         }
     }
+    // Static builds (Metal, CPU): a no-op; the backends are compiled in.
     transcribe_cpp::init_backends_default().map_err(|e| e.to_string())
+}
+
+/// A broken GPU driver (missing or old vulkan-1.dll) must fail ggml-vulkan.dll's load quietly
+/// instead of popping a modal "entry point not found" / "DLL missing" dialog. Process-wide,
+/// added to whatever mode is already set.
+#[cfg(windows)]
+fn quiet_dll_errors() {
+    const SEM_FAILCRITICALERRORS: u32 = 0x0001;
+    const SEM_NOOPENFILEERRORBOX: u32 = 0x8000;
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn SetErrorMode(mode: u32) -> u32;
+    }
+    // SAFETY: SetErrorMode only swaps a process flag word; setting it returns the old value,
+    // which is the documented way to read and combine the flags.
+    unsafe {
+        let old = SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX);
+        SetErrorMode(old | SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX);
+    }
 }
 
 /// Compute devices for speech, in registry order (discrete GPU, integrated GPU, CPU).
@@ -103,17 +123,22 @@ fn user_models_dir() -> PathBuf {
 /// A model the user placed in `<data_dir>/app.otto.desktop/models/` wins (lets them swap
 /// models); otherwise the one bundled with the app. If neither exists, the user path.
 pub fn model_path(name: &str) -> PathBuf {
-    let user = user_models_dir().join(name);
-    if user.is_file() {
-        return user;
-    }
     // Bundled with the app: Otto.app/Contents/Resources on a Mac, next to Otto.exe on Windows.
     #[cfg(target_os = "macos")]
     let resources = |exe: &Path| Some(exe.parent()?.parent()?.join("Resources"));
     #[cfg(not(target_os = "macos"))]
     let resources = |exe: &Path| exe.parent().map(Path::to_path_buf);
-    let bundled = std::env::current_exe().ok().and_then(|exe| Some(resources(&exe)?.join("models").join(name)));
-    bundled.filter(|p| p.is_file()).unwrap_or(user)
+    let bundled = std::env::current_exe().ok().and_then(|exe| Some(resources(&exe)?.join("models")));
+    resolve_model(&user_models_dir(), bundled.as_deref(), name)
+}
+
+/// User folder, then bundled folder, then the user path (so errors name where to put it).
+fn resolve_model(user_dir: &Path, bundled_dir: Option<&Path>, name: &str) -> PathBuf {
+    let user = user_dir.join(name);
+    if user.is_file() {
+        return user;
+    }
+    bundled_dir.map(|d| d.join(name)).filter(|p| p.is_file()).unwrap_or(user)
 }
 
 pub struct Stt {
@@ -124,12 +149,12 @@ pub struct Stt {
 }
 
 /// Biasing toward "Otto": vocabulary when the model takes it (Whisper), else a context
-/// prompt (other Whisper builds), else nothing (Parakeet ignores both). ITN is never set:
+/// prompt when the model has a conditioning slot, else nothing (Parakeet supports neither). ITN is never set:
 /// no supported model has a toggle, so Otto normalizes numbers itself.
 fn run_options(model: &Model) -> RunOptions {
     if model.supports(Feature::Vocabulary) {
         RunOptions { vocabulary: vec![VOCABULARY.into()], ..Default::default() }
-    } else if model.arch() == "whisper" {
+    } else if model.supports(Feature::ContextPrompt) {
         RunOptions { prompt: Some(VOCABULARY.into()), ..Default::default() }
     } else {
         RunOptions::default()
@@ -218,6 +243,24 @@ mod tests {
     fn model_path_falls_back_to_user_folder() {
         let p = model_path("no-such-model-xyz.gguf");
         assert!(p.ends_with("app.otto.desktop/models/no-such-model-xyz.gguf"), "{}", p.display());
+    }
+
+    #[test]
+    fn user_models_folder_wins_over_bundled() {
+        let root = std::env::temp_dir().join(format!("otto-model-path-{}", std::process::id()));
+        let (user, bundled) = (root.join("user"), root.join("bundled"));
+        std::fs::create_dir_all(&user).unwrap();
+        std::fs::create_dir_all(&bundled).unwrap();
+        let name = "m.gguf";
+        // Neither: the user path.
+        assert_eq!(resolve_model(&user, Some(&bundled), name), user.join(name));
+        // Bundled only.
+        std::fs::write(bundled.join(name), b"b").unwrap();
+        assert_eq!(resolve_model(&user, Some(&bundled), name), bundled.join(name));
+        // Both: the user copy wins.
+        std::fs::write(user.join(name), b"u").unwrap();
+        assert_eq!(resolve_model(&user, Some(&bundled), name), user.join(name));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
