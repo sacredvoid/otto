@@ -1,0 +1,46 @@
+id	text	entity	kind
+name01	Hey Otto, message Priya that I am running late.	Priya	speech
+name02	Send Jordan the quarterly report.	Jordan	speech
+name03	Otto, call Samanvya.	Samanvya	speech
+name04	Tell Priya the design review is moved to Friday.	Priya	speech
+name05	Hey Otto, ask Jordan if he has the contract.	Jordan	speech
+name06	Add Samanvya to the planning meeting.	Samanvya	speech
+name07	Remind me to thank Priya for the slides.	Priya	speech
+name08	Forward this thread to Jordan.	Jordan	speech
+name09	Otto, schedule a one on one with Samanvya.	Samanvya	speech
+name10	Tell Jordan I will send the draft tonight.	Jordan	speech
+app01	Hey Otto, open Notion.	Notion	speech
+app02	Switch to Slack.	Slack	speech
+app03	Otto, open the Figma file for the landing page.	Figma	speech
+app04	Check my Outlook calendar.	Outlook	speech
+app05	Create a new page in Notion called weekly notes.	Notion	speech
+app06	Post a status update in Slack.	Slack	speech
+app07	Hey Otto, share the Figma link with the team.	Figma	speech
+app08	Search Outlook for the invoice from last week.	Outlook	speech
+mail01	Send an email to priya at nymbl dot app.	priya@nymbl.app	speech
+mail02	Hey Otto, email jordan at example dot com.	jordan@example.com	speech
+mail03	Reply to samanvya at nymbl dot app.	samanvya@nymbl.app	speech
+mail04	Forward it to santosh at nymbl dot app.	santosh@nymbl.app	speech
+mail05	Otto, cc priya at example dot org.	priya@example.org	speech
+mail06	Send the notes to jordan at nymbl dot app.	jordan@nymbl.app	speech
+time01	Hey Otto, schedule a meeting at 4:15.	4:15	speech
+time02	Move the standup to 10:00.	10:00	speech
+time03	Remind me at 4:30 to call the dentist.	4:30	speech
+time04	Set a timer for 25 minutes.	25 minutes	speech
+time05	Book a room for 12 people.	12 people	speech
+time06	Otto, wake me up at 7:45.	7:45	speech
+time07	Block my calendar until 3:00.	3:00	speech
+time08	Schedule the review for 2:30 tomorrow.	2:30	speech
+follow01	No, make it shorter.	shorter	speech
+follow02	Actually, make it more formal.	formal	speech
+follow03	No, change it to Thursday.	Thursday	speech
+follow04	Add please at the end.	please	speech
+word01	No.	no	speech
+word02	Yes.	yes	speech
+word03	Stop.	stop	speech
+word04	Cancel.	cancel	speech
+sil01	Tap and wait, say nothing.		silence
+sil02	Tap and wait, breathe normally.		silence
+sil03	Tap and wait, type on the keyboard.		silence
+sil04	Tap and wait, stay quiet and let room noise in.		silence
+sil05	Tap and wait, cough once.		silence
