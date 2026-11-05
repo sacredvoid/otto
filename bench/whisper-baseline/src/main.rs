@@ -43,8 +43,16 @@ fn run() -> Result<(), String> {
         model = Some(PathBuf::from(args.remove(i + 1)));
         args.remove(i);
     }
+    let mut label = MODEL_NAME.to_string();
+    if let Some(i) = args.iter().position(|a| a == "--label") {
+        if i + 1 >= args.len() {
+            return Err("--label needs a name".into());
+        }
+        label = args.remove(i + 1);
+        args.remove(i);
+    }
     if args.len() != 3 {
-        return Err("usage: whisper-baseline <commands.tsv> <clips_dir> <out_dir> [--model <path>]".into());
+        return Err("usage: whisper-baseline <commands.tsv> <clips_dir> <out_dir> [--model <path>] [--label <name>]".into());
     }
     let (tsv, clips, out) = (Path::new(&args[0]), Path::new(&args[1]), Path::new(&args[2]));
     // Default: the repo's bundled model (bench/ is one level below the repo root).
@@ -92,7 +100,7 @@ fn run() -> Result<(), String> {
         };
         println!("{} {}ms {:?}", c.id, ms, text);
         rows.push(Row {
-            model: MODEL_NAME.into(),
+            model: label.clone(),
             device: DEVICE.into(),
             id: c.id.clone(),
             kind: c.kind,
@@ -102,7 +110,7 @@ fn run() -> Result<(), String> {
             hit,
         });
     }
-    let mem = vec![(MODEL_NAME.to_string(), DEVICE.to_string(), peak_memory_mb())];
+    let mem = vec![(label.clone(), DEVICE.to_string(), peak_memory_mb())];
     write_reports(&rows, &mem, out)?;
     println!("done: {} transcribed, {skipped} skipped -> {}", rows.len(), out.display());
     Ok(())
