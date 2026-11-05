@@ -152,6 +152,7 @@ pub struct Stt {
     session: Mutex<Session>,
     options: RunOptions,
     device: DeviceInfo,
+    path: PathBuf,
 }
 
 /// Biasing toward "Otto": vocabulary when the model takes it (Whisper), else a context
@@ -198,7 +199,7 @@ impl Stt {
         let model = Model::load_with(path, &options).map_err(|e| format!("could not load speech model: {e}"))?;
         let load_ms = t.elapsed().as_millis();
         let session = model.session().map_err(|e| format!("could not start speech session: {e}"))?;
-        let stt = Stt { options: run_options(&model), model, session: Mutex::new(session), device: device.clone() };
+        let stt = Stt { options: run_options(&model), model, session: Mutex::new(session), device: device.clone(), path: path.to_path_buf() };
 
         let t = Instant::now();
         let silence = vec![0.0f32; SAMPLE_RATE as usize / 2];
@@ -219,7 +220,8 @@ impl Stt {
         Ok(stt)
     }
 
-    fn run(&self, samples: &[f32]) -> transcribe_cpp::Result<String> {
+    /// Like `transcribe`, but keeps the error kind (device fault or bad input).
+    pub fn run(&self, samples: &[f32]) -> transcribe_cpp::Result<String> {
         let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
         session.run(samples, &self.options).map(|t| t.text.trim().to_string())
     }
@@ -231,6 +233,11 @@ impl Stt {
 
     pub fn device(&self) -> &DeviceInfo {
         &self.device
+    }
+
+    /// The model file this was loaded from.
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 }
 

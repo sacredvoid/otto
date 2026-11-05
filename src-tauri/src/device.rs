@@ -6,6 +6,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::speech_config::DevicePref;
+use transcribe_cpp::ErrorKind;
+
 use crate::stt::{DeviceInfo, DeviceKind, Stt, SAMPLE_RATE};
 
 /// Devices worth trying, best first, always ending with the CPU.
@@ -25,14 +27,30 @@ pub fn candidates(pref: &DevicePref, all: &[DeviceInfo]) -> Vec<DeviceInfo> {
     out
 }
 
-/// Picks the device to run speech on. A GPU candidate is timed against the CPU and kept only
-/// when it is faster; a GPU whose timing fails is dropped. The CPU is never timed alone.
+/// Picks the device to run speech on.
+/// Auto: the CPU is timed first, then the first GPU candidate; the GPU is kept only when strictly
+/// faster (a tie keeps the CPU). Named: the named GPU is honoured without a race; it only has to
+/// load and run. Any GPU error gives the CPU. Nothing is timed when there's no GPU candidate.
 pub fn choose(pref: &DevicePref, all: &[DeviceInfo], mut time_warmup: impl FnMut(&DeviceInfo) -> Result<u128, String>) -> DeviceInfo {
     let list = candidates(pref, all);
     let cpu = list.last().cloned().unwrap_or_else(DeviceInfo::cpu);
     let Some(gpu) = list.into_iter().find(|d| d.kind != DeviceKind::Cpu) else {
         return cpu;
     };
+    if matches!(pref, DevicePref::Named(_)) {
+        return match time_warmup(&gpu) {
+            Ok(ms) => {
+                println!("[otto] speech device check: {} {ms} ms, using it (named in config)", gpu.name);
+                gpu
+            }
+            Err(e) => {
+                println!("[otto] speech moved to CPU: {} failed its check: {e}", gpu.name);
+                cpu
+            }
+        };
+    }
+    // CPU first, so its model can be dropped before the GPU's loads (one model in memory at a time).
+    let cpu_ms = time_warmup(&cpu);
     let gpu_ms = match time_warmup(&gpu) {
         Ok(ms) => ms,
         Err(e) => {
@@ -40,7 +58,7 @@ pub fn choose(pref: &DevicePref, all: &[DeviceInfo], mut time_warmup: impl FnMut
             return cpu;
         }
     };
-    match time_warmup(&cpu) {
+    match cpu_ms {
         Ok(cpu_ms) if gpu_ms < cpu_ms => {
             println!("[otto] speech device check: {} {gpu_ms} ms vs CPU {cpu_ms} ms, using {}", gpu.name, gpu.name);
             gpu
@@ -77,31 +95,48 @@ pub fn time_transcribe(stt: &Stt) -> Result<u128, String> {
     Ok(t.elapsed().as_millis())
 }
 
-/// Loads the model on the device `pref` and the timed check pick. Each checked device is loaded
-/// once; the winner's model is kept and the loser's dropped. Slow (seconds): call off the UI thread.
+/// Loads the model on the device `pref` and the timed check pick. Only one model is in memory
+/// at a time: the CPU's is dropped right after its check, the GPU's is kept, and the CPU is
+/// loaded again (~300 ms) only if it wins. Slow (seconds): call off the UI thread.
 pub fn load_best(path: &Path, pref: &DevicePref, all: &[DeviceInfo]) -> Result<Stt, String> {
-    let mut loaded: Vec<Stt> = Vec::new();
+    let mut gpu_model: Option<Stt> = None;
     let chosen = choose(pref, all, |d| {
         let stt = Stt::load(path, d)?;
         let ms = time_transcribe(&stt)?;
-        loaded.push(stt);
+        if d.kind != DeviceKind::Cpu {
+            gpu_model = Some(stt);
+        }
         Ok(ms)
     });
-    match loaded.into_iter().find(|s| *s.device() == chosen) {
+    match gpu_model.filter(|s| *s.device() == chosen) {
         Some(stt) => Ok(stt),
         None => Stt::load(path, &chosen),
     }
 }
 
+/// A failed transcription. `device_fault` means the compute device itself failed (backend
+/// error, out of memory, unknown native failure), not that this input was unusable.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpeechError {
+    pub message: String,
+    pub device_fault: bool,
+}
+
+/// Only backend-class failures justify leaving the GPU; input problems (too short, too long,
+/// aborted, repetitive output) would fail on the CPU too.
+fn is_device_fault(kind: ErrorKind) -> bool {
+    matches!(kind, ErrorKind::Backend | ErrorKind::OutOfMemory | ErrorKind::Other)
+}
+
 /// Something that turns 16 kHz mono samples into text.
 pub trait Transcriber {
-    fn transcribe(&self, samples: &[f32]) -> Result<String, String>;
+    fn transcribe(&self, samples: &[f32]) -> Result<String, SpeechError>;
     fn on_gpu(&self) -> bool;
 }
 
 impl Transcriber for Stt {
-    fn transcribe(&self, samples: &[f32]) -> Result<String, String> {
-        Stt::transcribe(self, samples)
+    fn transcribe(&self, samples: &[f32]) -> Result<String, SpeechError> {
+        self.run(samples).map_err(|e| SpeechError { device_fault: is_device_fault(e.kind()), message: e.to_string() })
     }
     fn on_gpu(&self) -> bool {
         self.device().kind != DeviceKind::Cpu
@@ -109,7 +144,7 @@ impl Transcriber for Stt {
 }
 
 impl<T: Transcriber + ?Sized> Transcriber for Arc<T> {
-    fn transcribe(&self, samples: &[f32]) -> Result<String, String> {
+    fn transcribe(&self, samples: &[f32]) -> Result<String, SpeechError> {
         (**self).transcribe(samples)
     }
     fn on_gpu(&self) -> bool {
@@ -117,18 +152,21 @@ impl<T: Transcriber + ?Sized> Transcriber for Arc<T> {
     }
 }
 
-/// Transcribes on `stt`; if that is a GPU and it fails, `reload_cpu` (given the GPU's error)
-/// supplies a CPU transcriber and the same samples are tried once more there.
+/// Transcribes on `stt`; if that is a GPU and the device itself failed, `reload_cpu` (given the
+/// GPU's error) supplies a CPU transcriber and the same samples are tried once more there.
+/// An input error fails this utterance only and leaves the GPU in place.
 pub fn transcribe_with_fallback(
     stt: &dyn Transcriber,
     reload_cpu: impl FnOnce(&str) -> Result<Box<dyn Transcriber>, String>,
     samples: &[f32],
 ) -> Result<String, String> {
     match stt.transcribe(samples) {
-        Err(e) if stt.on_gpu() => reload_cpu(&e)?.transcribe(samples),
-        result => result,
+        Ok(text) => Ok(text),
+        Err(e) if e.device_fault && stt.on_gpu() => reload_cpu(&e.message)?.transcribe(samples).map_err(|e| e.message),
+        Err(e) => Err(e.message),
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -153,6 +191,10 @@ mod tests {
         }
     }
 
+    fn names(ds: &[DeviceInfo]) -> Vec<String> {
+        ds.iter().map(|d| d.name.clone()).collect()
+    }
+
     #[test]
     fn auto_prefers_discrete_over_integrated() {
         let c = candidates(&DevicePref::Auto, &[intel(), rtx(), cpu()]);
@@ -164,6 +206,8 @@ mod tests {
         let asked = RefCell::new(vec![]);
         let table = [("RTX", Ok(900)), ("Core", Ok(400))];
         assert_eq!(choose(&DevicePref::Auto, &[intel(), rtx(), cpu()], timer(&table, &asked)), cpu());
+        // CPU first (so only one model is loaded at a time), then only the first GPU candidate.
+        assert_eq!(*asked.borrow(), names(&[cpu(), rtx()]));
     }
 
     #[test]
@@ -171,8 +215,14 @@ mod tests {
         let asked = RefCell::new(vec![]);
         let table = [("RTX", Ok(80)), ("Core", Ok(400))];
         assert_eq!(choose(&DevicePref::Auto, &[intel(), rtx(), cpu()], timer(&table, &asked)), rtx());
-        // Only the first GPU candidate races the CPU.
-        assert_eq!(asked.borrow().len(), 2, "{:?}", asked.borrow());
+        assert_eq!(*asked.borrow(), names(&[cpu(), rtx()]));
+    }
+
+    #[test]
+    fn auto_tie_keeps_cpu() {
+        let asked = RefCell::new(vec![]);
+        let table = [("RTX", Ok(400)), ("Core", Ok(400))];
+        assert_eq!(choose(&DevicePref::Auto, &[rtx(), cpu()], timer(&table, &asked)), cpu());
     }
 
     #[test]
@@ -197,6 +247,13 @@ mod tests {
     }
 
     #[test]
+    fn cpu_check_error_keeps_working_gpu() {
+        let asked = RefCell::new(vec![]);
+        let table = [("RTX", Ok(900)), ("Core", Err("cpu failed".to_string()))];
+        assert_eq!(choose(&DevicePref::Auto, &[rtx(), cpu()], timer(&table, &asked)), rtx());
+    }
+
+    #[test]
     fn named_device_missing_gives_cpu() {
         let asked = RefCell::new(vec![]);
         let table = [("RTX", Ok(80)), ("Core", Ok(400))];
@@ -207,14 +264,23 @@ mod tests {
     }
 
     #[test]
-    fn named_device_is_timed_against_cpu() {
+    fn named_device_is_honoured_without_cpu_race() {
         let asked = RefCell::new(vec![]);
-        let table = [("UHD", Ok(300)), ("RTX", Ok(80)), ("Core", Ok(400))];
+        // Slower than the CPU, but the user asked for it.
+        let table = [("UHD", Ok(300)), ("RTX", Ok(80)), ("Core", Ok(100))];
         // "intel" also appears in the CPU's name; only GPUs match a name.
         let pref = DevicePref::Named("intel".into());
         assert_eq!(candidates(&pref, &[rtx(), intel(), cpu()]), vec![intel(), cpu()]);
         assert_eq!(choose(&pref, &[rtx(), intel(), cpu()], timer(&table, &asked)), intel());
-        assert_eq!(asked.borrow().len(), 2);
+        assert_eq!(*asked.borrow(), names(&[intel()]));
+    }
+
+    #[test]
+    fn named_device_error_gives_cpu() {
+        let asked = RefCell::new(vec![]);
+        let table = [("UHD", Err("warm-up failed".to_string())), ("Core", Ok(100))];
+        let pref = DevicePref::Named("UHD".into());
+        assert_eq!(choose(&pref, &[intel(), cpu()], timer(&table, &asked)), cpu());
     }
 
     #[test]
@@ -234,25 +300,40 @@ mod tests {
         let asked = RefCell::new(vec![]);
         let table = [("Apple", Ok(60)), ("CPU", Ok(500))];
         assert_eq!(choose(&DevicePref::Auto, &[metal.clone(), mac_cpu], timer(&table, &asked)), metal);
-        assert_eq!(*asked.borrow(), vec!["Apple M2".to_string(), "CPU".to_string()]);
+        assert_eq!(*asked.borrow(), vec!["CPU".to_string(), "Apple M2".to_string()]);
+    }
+
+    #[test]
+    fn device_fault_kinds() {
+        assert!(is_device_fault(ErrorKind::Backend));
+        assert!(is_device_fault(ErrorKind::OutOfMemory));
+        assert!(!is_device_fault(ErrorKind::InputTooShort));
+        assert!(!is_device_fault(ErrorKind::InputTooLong));
+        assert!(!is_device_fault(ErrorKind::Aborted));
     }
 
     struct Fake {
         gpu: bool,
-        answer: Result<String, String>,
+        answer: Result<String, SpeechError>,
     }
     impl Transcriber for Fake {
-        fn transcribe(&self, _: &[f32]) -> Result<String, String> {
+        fn transcribe(&self, _: &[f32]) -> Result<String, SpeechError> {
             self.answer.clone()
         }
         fn on_gpu(&self) -> bool {
             self.gpu
         }
     }
+    fn fault(m: &str) -> SpeechError {
+        SpeechError { message: m.into(), device_fault: true }
+    }
+    fn input_error(m: &str) -> SpeechError {
+        SpeechError { message: m.into(), device_fault: false }
+    }
 
     #[test]
     fn runtime_error_reloads_on_cpu() {
-        let gpu = Fake { gpu: true, answer: Err("vulkan device lost".into()) };
+        let gpu = Fake { gpu: true, answer: Err(fault("vulkan device lost")) };
         let reason = RefCell::new(String::new());
         let text = transcribe_with_fallback(
             &gpu,
@@ -267,10 +348,30 @@ mod tests {
     }
 
     #[test]
+    fn gpu_input_error_does_not_reload() {
+        let gpu = Fake { gpu: true, answer: Err(input_error("input too short")) };
+        let text = transcribe_with_fallback(&gpu, |_| panic!("must not reload"), &[0.0; 16]);
+        assert_eq!(text, Err("input too short".into()));
+    }
+
+    #[test]
+    fn failed_cpu_reload_fails_this_utterance() {
+        let gpu = Fake { gpu: true, answer: Err(fault("backend error")) };
+        let text = transcribe_with_fallback(&gpu, |_| Err("could not load speech model".into()), &[0.0; 16]);
+        assert_eq!(text, Err("could not load speech model".into()));
+    }
+
+    #[test]
     fn cpu_error_is_not_retried() {
-        let cpu = Fake { gpu: false, answer: Err("bad audio".into()) };
+        let cpu = Fake { gpu: false, answer: Err(fault("bad audio")) };
         let text = transcribe_with_fallback(&cpu, |_| panic!("must not reload"), &[0.0; 16]);
         assert_eq!(text, Err("bad audio".into()));
+    }
+
+    #[test]
+    fn working_gpu_is_not_reloaded() {
+        let gpu = Fake { gpu: true, answer: Ok("hi".into()) };
+        assert_eq!(transcribe_with_fallback(&gpu, |_| panic!("must not reload"), &[0.0; 16]), Ok("hi".into()));
     }
 
     /// Run with: cargo test real_device_choice -- --ignored --nocapture
@@ -291,11 +392,5 @@ mod tests {
             println!("{pref:?} -> {} (choice took {} ms)", stt.device().name, t.elapsed().as_millis());
             println!("{pref:?} -> again: {} ms", time_transcribe(&stt).unwrap());
         }
-    }
-
-    #[test]
-    fn working_gpu_is_not_reloaded() {
-        let gpu = Fake { gpu: true, answer: Ok("hi".into()) };
-        assert_eq!(transcribe_with_fallback(&gpu, |_| panic!("must not reload"), &[0.0; 16]), Ok("hi".into()));
     }
 }
