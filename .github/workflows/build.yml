@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: write # only used by the release job on tags
+  pull-requests: read # lets the changes job list a PR's files
 
 concurrency:
   group: build-${{ github.ref }}
@@ -92,9 +93,27 @@ jobs:
           path: ${{ matrix.bundle }}
           retention-days: 14
 
+  # Which parts changed, so app-only pushes skip the benchmark build.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      bench: ${{ steps.filter.outputs.bench }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            bench:
+              - "bench/**"
+              - ".github/workflows/build.yml"
+
   # The speech benchmark (bench/) is a dev tool; this keeps it compiling with Metal so
   # it can run on a Mac. The Windows build runs it by hand (see bench/RESULTS.md).
+  # It builds two copies of ggml, so it runs only when bench/ or this workflow changes.
   bench:
+    needs: changes
+    if: needs.changes.outputs.bench == 'true'
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4

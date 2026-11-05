@@ -35,7 +35,7 @@ Installer size impact: the winner file is 729.6 MB against 148.0 MB for the base
 
 ## Windows build finding
 
-Otto's current Windows build runs base.en at p50 10135 ms and p95 11589 ms. The same model from an optimized build runs at p50 1333 ms and p95 1648 ms, about 7.6 times faster at the median. The cause, per a reviewer's build experiment (CMakeCache and compile flags): cmake-rs 0.1.58 with the Visual Studio generator compiles whisper.cpp at /Od (no optimization). Any base.en comparison on Windows should use the optimized build, and the shipped build needs the fix regardless of which model wins.
+Otto's current Windows build runs base.en at p50 10135 ms and p95 11589 ms. The same model from an optimized build runs at p50 1333 ms and p95 1648 ms, about 7.6 times faster at the median. The cause, per a reviewer's build experiment (CMakeCache and compile flags): cmake-rs 0.1.58 with the Visual Studio generator compiles whisper.cpp at /Od (no optimization). Any base.en comparison on Windows should use the optimized build, and the shipped build needs the fix regardless of which model wins. This branch removes whisper-rs from Otto, and transcribe-cpp builds its native code at /O2, so the shipped app no longer has the /Od problem.
 
 ## No-GPU check
 

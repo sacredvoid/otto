@@ -5,4 +5,4 @@
 # (Git Bash mangles /MD). Do NOT put these in .cargo/config.toml: they would break macOS.
 $env:CMAKE_C_FLAGS_RELEASE   = "-MD -O2 -Ob2 -DNDEBUG"
 $env:CMAKE_CXX_FLAGS_RELEASE = "-MD -O2 -Ob2 -DNDEBUG -utf-8"
-$env:CARGO_TARGET_DIR        = "G:\otto-target-opt"
+# Point CARGO_TARGET_DIR at a folder of its own if you also build without these flags.

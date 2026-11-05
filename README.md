@@ -144,7 +144,7 @@ Everything lives in `~/Otto/config.json`. Every key is optional.
 }
 ```
 
-To use a different speech model, put its file in Otto's models folder (`~/Library/Application Support/app.otto.desktop/models/` on a Mac, `%APPDATA%\app.otto.desktop\models\` on Windows) and set `"speech_model"` to its file name. Otto accepts Parakeet and Whisper files in GGUF or ggml format. `ggml-base.en.bin` brings back the Whisper model Otto used before.
+To use a different speech model, put its file in Otto's models folder (`~/Library/Application Support/app.otto.desktop/models/` on a Mac, `%APPDATA%\app.otto.desktop\models\` on Windows) and set `"speech_model"` to its file name. Otto accepts Parakeet and Whisper files in GGUF or ggml format. `ggml-base.en.bin` ([download](https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin)) brings back the Whisper model Otto used before.
 
 To edit what Otto remembers about you, open `~/Otto/memory.md`. It's one fact per line, and Otto adds lines when you tell it something worth keeping.
 
