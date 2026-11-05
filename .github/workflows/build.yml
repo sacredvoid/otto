@@ -52,12 +52,20 @@ jobs:
       # The Windows speech engine builds its Vulkan GPU backend, which needs the SDK's
       # headers and shader compiler. Installed users don't need it: without a Vulkan
       # driver Otto runs speech on the CPU.
+      # The full LunarG installer: ggml-vulkan also needs SPIRV-Headers, which slimmer
+      # SDK builds leave out.
       - name: Install the Vulkan SDK
         if: runner.os == 'Windows'
-        uses: humbletim/install-vulkan-sdk@v1.2
-        with:
-          version: 1.4.309.0
-          cache: true
+        env:
+          VULKAN_VERSION: 1.4.363.0
+        run: |
+          curl -sSfL --retry 5 -o "$RUNNER_TEMP/vulkan-sdk.exe" \
+            "https://sdk.lunarg.com/sdk/download/$VULKAN_VERSION/windows/vulkansdk-windows-X64-$VULKAN_VERSION.exe"
+          sdk="C:\\VulkanSDK\\$VULKAN_VERSION"
+          "$RUNNER_TEMP/vulkan-sdk.exe" --root "$sdk" --accept-licenses --default-answer --confirm-command install
+          test -d "/c/VulkanSDK/$VULKAN_VERSION/Lib/cmake/SPIRV-Headers"
+          echo "VULKAN_SDK=$sdk" >> "$GITHUB_ENV"
+          echo "$sdk\\Bin" >> "$GITHUB_PATH"
 
       - name: Cache speech models
         uses: actions/cache@v4
