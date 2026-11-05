@@ -1,0 +1,13 @@
+[package]
+name = "stt_bench_common"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hound = "3.5"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_System_ProcessStatus", "Win32_System_Threading"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
