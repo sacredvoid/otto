@@ -11,6 +11,7 @@ mod stt;
 mod tasks;
 mod tray;
 mod updates;
+mod vad;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -23,6 +24,8 @@ use tauri_plugin_global_shortcut::ShortcutState;
 const HOTKEY: &str = "ctrl+alt+space";
 /// Shorter than this is an accidental tap, not speech.
 const MIN_SAMPLES: usize = stt::SAMPLE_RATE as usize * 3 / 10;
+/// Bundled Silero VAD model (see vad.rs).
+const VAD_MODEL: &str = "silero-vad-v6.2-F32.gguf";
 const RELEASE_TAIL: Duration = Duration::from_millis(300);
 /// How long a hotkey release waits for the speech model while it is still loading at startup
 /// (the GPU check takes ~3 s, up to ~13 s on a cold driver cache).
@@ -35,6 +38,8 @@ struct Otto {
     /// value, never during a transcription; `stt_ready` is signalled when loading finishes.
     stt: Mutex<Option<Result<Arc<stt::Stt>, String>>>,
     stt_ready: Condvar,
+    /// Set once at startup: Some when the VAD model loaded, None when it could not (no gating).
+    vad: std::sync::OnceLock<Option<vad::Vad>>,
     /// Serializes moves to the CPU so two failing utterances don't both reload.
     reloading: Mutex<()>,
     /// Bumped on every hotkey press so a stale "hide" timer can't close a newer pill.
@@ -93,6 +98,20 @@ fn on_release(app: &AppHandle) {
             hide_later(&app);
             return;
         }
+        // Silent taps and key-clicks never reach the recognizer. No gate (not loaded yet, or it
+        // failed to load): transcribe everything.
+        let samples = match app.state::<Otto>().vad.get().and_then(|v| v.as_ref()) {
+            Some(vad) => match vad.speech(&samples) {
+                Some(trimmed) => trimmed,
+                None => {
+                    println!("[otto] no speech in the clip, skipping transcription");
+                    pill(&app, "miss", None, None);
+                    hide_later(&app);
+                    return;
+                }
+            },
+            None => samples,
+        };
         pill(&app, "transcribing", None, None);
         let started = Instant::now();
         let result = match current_stt(&app, MODEL_WAIT) {
@@ -306,6 +325,15 @@ pub fn run() {
                 demo(app.handle().clone());
             }
 
+            // The gate loads on its own thread so it never waits for the (slower) speech model.
+            let vad_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                stt::init_backends();
+                let loaded = vad::Vad::load(&stt::model_path(VAD_MODEL))
+                    .inspect_err(|e| eprintln!("[otto] {e}; transcribing every clip without a silence gate"))
+                    .ok();
+                let _ = vad_handle.state::<Otto>().vad.set(loaded);
+            });
             let handle = app.handle().clone();
             std::thread::spawn(move || {
                 stt::init_backends();
