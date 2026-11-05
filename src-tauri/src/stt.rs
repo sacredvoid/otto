@@ -34,6 +34,12 @@ impl DeviceInfo {
     pub fn cpu() -> Self {
         DeviceInfo { name: "CPU".into(), kind: DeviceKind::Cpu, ggml_name: "CPU".into() }
     }
+
+    /// A made-up device for tests that never reach the native library.
+    #[cfg(test)]
+    pub fn fake(name: &str, kind: DeviceKind) -> Self {
+        DeviceInfo { name: name.into(), kind, ggml_name: name.into() }
+    }
 }
 
 fn kind_of(d: &transcribe_cpp::Device) -> Option<DeviceKind> {

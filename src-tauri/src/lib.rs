@@ -1,4 +1,5 @@
 mod audio;
+mod device;
 mod gate;
 mod history;
 mod onboarding;
@@ -12,7 +13,7 @@ mod tray;
 mod updates;
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -27,7 +28,11 @@ const RELEASE_TAIL: Duration = Duration::from_millis(300);
 #[derive(Default)]
 struct Otto {
     recording: Mutex<Option<audio::Recording>>,
-    stt: OnceLock<Result<stt::Stt, String>>,
+    /// None while the model loads. Shared via Arc so a transcription never holds the lock;
+    /// a move to the CPU swaps the value under a brief write lock.
+    stt: RwLock<Option<Result<Arc<stt::Stt>, String>>>,
+    /// Serializes moves to the CPU so two failing utterances don't both reload.
+    reloading: Mutex<()>,
     /// Bumped on every hotkey press so a stale "hide" timer can't close a newer pill.
     generation: AtomicU64,
 }
@@ -86,9 +91,14 @@ fn on_release(app: &AppHandle) {
         }
         pill(&app, "transcribing", None, None);
         let started = Instant::now();
-        let result = match app.state::<Otto>().stt.get() {
-            Some(Ok(stt)) => stt.transcribe(&samples),
-            Some(Err(e)) => Err(e.clone()),
+        let current = app.state::<Otto>().stt.read().unwrap_or_else(|p| p.into_inner()).clone();
+        let result = match current {
+            Some(Ok(stt)) => device::transcribe_with_fallback(
+                &stt,
+                |reason| reload_on_cpu(&app, reason).map(|cpu| Box::new(cpu) as Box<dyn device::Transcriber>),
+                &samples,
+            ),
+            Some(Err(e)) => Err(e),
             None => Err("Speech model is still loading".into()),
         };
         let ms = started.elapsed().as_millis();
@@ -122,6 +132,26 @@ fn on_release(app: &AppHandle) {
         }
         hide_later(&app);
     });
+}
+
+/// The GPU failed mid-session: load the model on the CPU and keep it there until restart.
+fn reload_on_cpu(app: &AppHandle, reason: &str) -> Result<Arc<stt::Stt>, String> {
+    let otto = app.state::<Otto>();
+    let _one_at_a_time = otto.reloading.lock().unwrap_or_else(|p| p.into_inner());
+    // Another utterance may have already moved speech while this one waited.
+    if let Some(Ok(stt)) = otto.stt.read().unwrap_or_else(|p| p.into_inner()).as_ref() {
+        if stt.device().kind == stt::DeviceKind::Cpu {
+            return Ok(stt.clone());
+        }
+    }
+    println!("[otto] speech moved to CPU: {reason}");
+    let cpu = stt::devices().into_iter().find(|d| d.kind == stt::DeviceKind::Cpu).unwrap_or_else(stt::DeviceInfo::cpu);
+    let loaded = stt::Stt::load(&stt::model_path(&speech_config::load().model), &cpu).map(Arc::new);
+    if let Err(e) = &loaded {
+        eprintln!("[otto] {e}");
+    }
+    *otto.stt.write().unwrap_or_else(|p| p.into_inner()) = Some(loaded.clone());
+    loaded
 }
 
 /// The Mac is going to sleep: drop any half-spoken request and put the island away.
@@ -270,17 +300,13 @@ pub fn run() {
             std::thread::spawn(move || {
                 stt::init_backends();
                 let config = speech_config::load();
-                // CPU for now; GPU selection and fallback come with the speech_device setting.
-                let device = stt::devices()
-                    .into_iter()
-                    .find(|d| d.kind == stt::DeviceKind::Cpu)
-                    .unwrap_or_else(stt::DeviceInfo::cpu);
-                let loaded = stt::Stt::load(&stt::model_path(&config.model), &device);
+                // Times the best GPU against the CPU (seconds); the hotkey says "still loading" meanwhile.
+                let loaded = device::load_best(&stt::model_path(&config.model), &config.device, &stt::devices());
                 match &loaded {
                     Ok(stt) => println!("[otto] speech model ready: {} on {}", config.model, stt.device().name),
                     Err(e) => eprintln!("[otto] {e}"),
                 }
-                let _ = handle.state::<Otto>().stt.set(loaded);
+                *handle.state::<Otto>().stt.write().unwrap_or_else(|p| p.into_inner()) = Some(loaded.map(Arc::new));
             });
             if !onboarding::is_onboarded() {
                 onboarding::show_onboarding(app.handle());
