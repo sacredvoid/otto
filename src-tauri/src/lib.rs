@@ -198,6 +198,17 @@ fn on_sleep(app: &AppHandle) {
 fn on_screens_changed(app: &AppHandle) {
     overlay::place(app);
     overlay::place_toasts(app);
+    // After sleep the GPU and caches are cold; warm the resident model now, off the UI thread,
+    // so the first command after wake is as fast as any other. Skipped while it is still loading.
+    if let Some(Ok(stt)) = current_stt(app, Duration::ZERO) {
+        std::thread::spawn(move || {
+            let t = Instant::now();
+            match stt.warm_up() {
+                Ok(()) => println!("[otto] speech warm-up after wake: {} ms", t.elapsed().as_millis()),
+                Err(e) => eprintln!("[otto] {e}"),
+            }
+        });
+    }
 }
 
 /// Whisper renders silence as tags like "[BLANK_AUDIO]" or "(wind blowing)".

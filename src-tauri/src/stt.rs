@@ -179,6 +179,17 @@ fn backend_for(d: &transcribe_cpp::Device) -> Option<Backend> {
 }
 
 impl Stt {
+    /// One run on 0.5 s of silence, so the next real command doesn't pay for cold caches or
+    /// (on Vulkan) pipeline compiles. Too-short input is fine here; any other error is not.
+    pub fn warm_up(&self) -> Result<(), String> {
+        let silence = vec![0.0f32; SAMPLE_RATE as usize / 2];
+        match self.run(&silence) {
+            Ok(_) => Ok(()),
+            Err(e) if e.kind() == ErrorKind::InputTooShort => Ok(()),
+            Err(e) => Err(format!("speech model warm-up failed: {e}")),
+        }
+    }
+
     /// Loads the model on `device` (no silent fallback) and warms it up, so the first
     /// utterance doesn't pay for GPU pipeline compilation.
     pub fn load(path: &Path, device: &DeviceInfo) -> Result<Self, String> {
@@ -202,12 +213,7 @@ impl Stt {
         let stt = Stt { options: run_options(&model), model, session: Mutex::new(session), device: device.clone(), path: path.to_path_buf() };
 
         let t = Instant::now();
-        let silence = vec![0.0f32; SAMPLE_RATE as usize / 2];
-        match stt.run(&silence) {
-            Ok(_) => {}
-            Err(e) if e.kind() == ErrorKind::InputTooShort => {}
-            Err(e) => return Err(format!("speech model warm-up failed: {e}")),
-        }
+        stt.warm_up()?;
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?");
         println!(
             "[otto] speech model {name} ({} {}) on {} [{}]: load {load_ms} ms, warm-up {} ms",
