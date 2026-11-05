@@ -6,7 +6,7 @@
 
 ## Results
 
-"Raw hit" comes from the runner. "Adjusted hit" also counts correct readings the normalizer misses: whole-hour answers for time02 and time07, and colon-less digit times for time06 and time08. Adjusted scores are computed on the CPU run of each model and shown for every device.
+"Raw hit" comes from the runner. "Adjusted hit" also counts correct readings the normalizer misses: whole-hour answers for time02 and time07, and colon-less digit times for time06 and time08. I computed adjusted scores from the CPU run rows of each model and list them for every device.
 
 | model | device | raw hit % | adjusted hit % | mean WER | p50 ms | p95 ms | silence clips with text | peak MB | model file MB |
 |---|---|---|---|---|---|---|---|---|---|
@@ -19,7 +19,7 @@
 | base.en (optimized build) | cpu | 52.5 | 62.5 | 0.313 | 1333 | 1648 | 5 | 343 | 148.0 |
 | base.en (as shipped, /Od build) | cpu | 50.0 | n/a | 0.322 | 10135 | 11589 | 4 | 343 | 148.0 |
 
-The as-shipped row is latency context only. Its run skipped sil01 and used an older name03 clip, so its hit, WER and silence numbers do not compare directly.
+The as-shipped row is latency context only. Its run skipped sil01 and used an older name03 clip, so its hit, WER and silence numbers do not compare with the other rows.
 
 Adjusted hit flips, by model on CPU (each flip adds 2.5 points):
 
@@ -35,11 +35,11 @@ Installer size impact: the winner file is 729.6 MB against 148.0 MB for the base
 
 ## Windows build finding
 
-Otto's current Windows build runs base.en at p50 10135 ms and p95 11589 ms. The same model from an optimized build runs at p50 1333 ms and p95 1648 ms, about 7.6 times faster at the median. The cause: cmake-rs 0.1.58 with the Visual Studio generator compiles whisper.cpp at /Od (no optimization). Any base.en comparison on Windows should use the optimized build, and the shipped build needs the fix regardless of which model wins.
+Otto's current Windows build runs base.en at p50 10135 ms and p95 11589 ms. The same model from an optimized build runs at p50 1333 ms and p95 1648 ms, about 7.6 times faster at the median. The cause, per a reviewer's build experiment (CMakeCache and compile flags): cmake-rs 0.1.58 with the Visual Studio generator compiles whisper.cpp at /Od (no optimization). Any base.en comparison on Windows should use the optimized build, and the shipped build needs the fix regardless of which model wins.
 
 ## No-GPU check
 
-A copy of the `tc` runner without `ggml-vulkan.dll` ran 10 clips. The NVIDIA device was "not found, skipped" and CPU transcription worked.
+A copy of the `tc` runner without `ggml-vulkan.dll` ran 10 clips. The NVIDIA device was "device 'nvidia' not found, skipping" and CPU transcription worked.
 
 | model | device | raw hit % | mean WER | p50 ms | p95 ms | silence clips with text | peak MB |
 |---|---|---|---|---|---|---|---|
@@ -50,7 +50,7 @@ These numbers come from a 10-clip subset, so they do not compare with the 45-cli
 
 ## Silence
 
-Parakeet produced no text on all 5 silence clips, on every device. Optimized base.en produced text on all 5: "[BLANK_AUDIO]" (twice), "[Music]", "*squeaking*" and "*cough*". Otto's `is_speech()` filter drops text fully wrapped in [] or (), so it removes the three bracketed outputs. The two asterisk outputs ("*squeaking*", "*cough*") would still reach the assistant as input.
+Parakeet produced no text on all 5 silence clips, on every device. Optimized base.en produced text on all 5: "[BLANK_AUDIO]" (twice), "[Music]", "*squeaking*" and "*cough*". Otto's `is_speech()` filter drops text wrapped in [] or (), so it removes the three bracketed outputs. The two asterisk outputs ("*squeaking*", "*cough*") would reach the assistant as input.
 
 ## Common misses
 
@@ -68,7 +68,7 @@ Count of the 11 commands that contain "Otto" where the hypothesis does not conta
 |---|---|---|
 | parakeet-0.6b-v2 | 3 of 11 | "He ought to" (name05), "Auto" (name09), "Autoccpr" (mail05) |
 | parakeet-110m | 11 of 11 | "Auto", "Oto" in every command |
-| base.en optimized | 7 of 11 | "Arto", "Hato", "Ottawa", "auto"; Otto dropped entirely in name05 and app03 |
+| base.en optimized | 7 of 11 | "Arto", "Hato", "Ottawa", "auto"; Otto dropped in name05 and app03 |
 
 Otto appears in 11 of the 40 commands, so a vocabulary or prompt bias for "Otto" is worth testing in the next stage. This bench ran no vocabulary.
 
@@ -76,6 +76,6 @@ Otto appears in 11 of the 40 commands, so a vocabulary or prompt bias for "Otto"
 
 - 40 spoken commands from one speaker on one laptop. Results do not cover other voices, accents or microphones.
 - All clips are real recordings of the scripted text, with no synthetic speech.
-- Cold start: the table shows warm numbers. The first GPU use after install compiles shaders, up to about 13 s for the 0.6B model on the RTX 4060, and later runs use the cache. `first_run_ms.csv` from the final run shows 95 ms first run and 873 ms load for the 0.6B model on NVIDIA, so that run used a warm shader cache. The CPU path has no shader compile (0.6B first run 415 ms, load 388 ms).
-- The adjusted score trusts a readable number in the right slot. For base.en time02 ("Who's the standard to 10?") the rule counts a hit although the sentence is wrong. Without that flip the optimized base.en adjusted score is 60.0.
+- Cold start: the table shows warm numbers. The first GPU use after install compiles shaders, and later runs use the cache. A Task 6 smoke run on a fresh driver cache measured 13.4 s for the 0.6B model's first GPU run on the RTX 4060; this run's cache was already warm (first_run_ms.csv: 95 ms first run, 873 ms load). The CPU path has no shader compile (0.6B first run 415 ms, load 388 ms).
+- The adjusted score trusts a readable number in the right slot. For base.en time02 ("Who's the standard to 10?") the rule counts a hit although the sentence is wrong. The same applies to base.en time08 ("Schedule the renews for 230 tomorrow."), flipped despite a wrong word. Without the time02 and time08 flips the optimized base.en adjusted score is 57.5.
 - Peak memory for the 0.6B model on CPU is 1115 MB, about three times the base.en peak of 343 MB.
