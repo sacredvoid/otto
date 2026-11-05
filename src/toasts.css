@@ -8,6 +8,8 @@
   --line: #e3ebe7;
   --teal-ink: #24594a;
   --rose-line: #eed6d3;
+  /* Glass tint: thick enough that dark ink stays readable over dark or busy windows. */
+  --tint: rgba(255, 255, 255, 0.62);
 }
 
 html,
@@ -50,7 +52,7 @@ body {
   padding: 0 10px 0 6px;
   box-sizing: border-box;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--tint);
   border: 1px solid rgba(255, 255, 255, 0.55);
   box-shadow: 0 6px 18px rgba(28, 38, 34, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   font-size: 13px;
@@ -108,7 +110,7 @@ body {
 @keyframes pill-in {
   0% { transform: translateY(-100%) scale(0.12, 0.7); background-color: rgba(0, 0, 0, 0.92); border-color: transparent; box-shadow: none; }
   32% { transform: translateY(5%) scale(0.16, 1.18); background-color: rgba(0, 0, 0, 0.78); border-color: transparent; }
-  58% { transform: translateY(0) scale(1.05, 0.9); background-color: rgba(255, 255, 255, 0.22); }
+  58% { transform: translateY(0) scale(1.05, 0.9); background-color: var(--tint); }
   78% { transform: scale(0.985, 1.025); }
   100% { transform: none; }
 }
@@ -157,8 +159,8 @@ body {
   display: flex;
   gap: 12px;
   padding: 14px 36px 14px 14px;
-  /* Native glass sits behind (glass.ts); this only tints and edges it. */
-  background: rgba(255, 255, 255, 0.28);
+  /* Native glass sits behind (glass.ts); this tints and edges it. */
+  background: var(--tint);
   border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 18px;
   box-shadow: 0 8px 24px rgba(28, 38, 34, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6);
@@ -200,6 +202,11 @@ body {
   flex: none;
   width: 34px;
   height: 34px;
+}
+.mascot svg,
+.pill-mascot svg {
+  /* A soft edge so the pale mascot doesn't vanish into light glass. */
+  filter: drop-shadow(0 0 1px rgba(28, 38, 34, 0.35));
 }
 .mascot svg {
   width: 100%;
@@ -297,7 +304,7 @@ body {
 
 /* Needs-you card: soft blue, like the mockup */
 .card[data-status="needs_you"] {
-  background: rgba(214, 232, 247, 0.45);
+  background: rgba(214, 232, 247, 0.72);
   border-color: rgba(207, 224, 239, 0.85);
 }
 .solid {
