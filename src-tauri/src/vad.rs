@@ -35,6 +35,9 @@ impl Vad {
     /// whole clip: never lose dictation to a gate fault.
     pub fn speech(&self, samples: &[f32]) -> Option<Vec<f32>> {
         let mut session = self.session.lock().unwrap_or_else(|p| p.into_inner());
+        // Default minimum segment (250 ms) on purpose: in the recorded clips a cough leaves a
+        // 224 ms segment that Parakeet hears as "Yeah." (a bogus command), while one-word
+        // commands ("no", "yes") leave 416 ms or more. A 64 ms minimum let the cough through.
         let result = match session.run(samples, &VadOptions::default()) {
             Ok(r) => r,
             Err(e) => {

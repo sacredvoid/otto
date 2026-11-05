@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Instant;
 
-use transcribe_cpp::{Backend, DeviceType, ErrorKind, Feature, Model, ModelOptions, RunOptions, Session};
+use transcribe_cpp::{Backend, BackendMask, DeviceType, ErrorKind, Feature, Model, ModelOptions, RunOptions, Session};
 
 pub const SAMPLE_RATE: u32 = 16_000;
 
@@ -76,16 +76,27 @@ fn init_backends_once() {
 }
 
 fn init_backends_inner() -> Result<(), String> {
+    // "speech_device": "cpu" keeps every GPU backend from running any code, so a GPU driver that
+    // crashes or hangs while starting up can't take Otto down with it.
+    let cpu_only = crate::speech_config::load().device == crate::speech_config::DevicePref::Cpu;
     // Windows ships the backend modules next to Otto.exe (and build.rs stages them next to
     // dev builds and test binaries), so point the loader there explicitly.
     #[cfg(windows)]
     {
         quiet_dll_errors();
         if let Some(dir) = std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)) {
-            return transcribe_cpp::init_backends(&dir).map_err(|e| format!("{e} (looked in {})", dir.display()));
+            let result = if cpu_only {
+                transcribe_cpp::init_backends_with(Some(&dir), BackendMask::for_backend(Backend::Cpu))
+            } else {
+                transcribe_cpp::init_backends(&dir)
+            };
+            return result.map_err(|e| format!("{e} (looked in {})", dir.display()));
         }
     }
-    // Static builds (Metal, CPU): a no-op; the backends are compiled in.
+    // Static builds (Metal, CPU): the backends are compiled in; the mask keeps Metal out on "cpu".
+    if cpu_only {
+        return transcribe_cpp::init_backends_with(None::<&Path>, BackendMask::for_backend(Backend::Cpu)).map_err(|e| e.to_string());
+    }
     transcribe_cpp::init_backends_default().map_err(|e| e.to_string())
 }
 
@@ -182,11 +193,16 @@ impl Stt {
     /// One run on 0.5 s of silence, so the next real command doesn't pay for cold caches or
     /// (on Vulkan) pipeline compiles. Too-short input is fine here; any other error is not.
     pub fn warm_up(&self) -> Result<(), String> {
+        self.warm_up_raw().map_err(|e| format!("speech model warm-up failed: {e}"))
+    }
+
+    /// `warm_up` keeping the error kind, so a caller can tell a device fault from the rest.
+    pub fn warm_up_raw(&self) -> transcribe_cpp::Result<()> {
         let silence = vec![0.0f32; SAMPLE_RATE as usize / 2];
         match self.run(&silence) {
             Ok(_) => Ok(()),
             Err(e) if e.kind() == ErrorKind::InputTooShort => Ok(()),
-            Err(e) => Err(format!("speech model warm-up failed: {e}")),
+            Err(e) => Err(e),
         }
     }
 
@@ -289,7 +305,7 @@ mod tests {
         assert!(all.iter().any(|d| d.kind == DeviceKind::Cpu), "{all:?}");
     }
 
-    /// Run with: OTTO_TEST_CLIP=G:\otto-work\clips\app01.wav cargo test -- --ignored stt::tests
+    /// Run with: OTTO_TEST_CLIP=<clips>\app01.wav cargo test -- --ignored stt::tests
     /// (app01 is "Hey Otto, open Notion."). Without OTTO_TEST_CLIP it uses macOS `say`.
     /// OTTO_TEST_ENTITY overrides the expected word ("notion").
     #[test]

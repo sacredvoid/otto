@@ -88,6 +88,8 @@ fn on_release(app: &AppHandle) {
     let Some(recording) = otto.recording.lock().unwrap().take() else {
         return;
     };
+    // A newer press bumps this; a slow result (model still loading) must not overwrite its pill.
+    let generation = otto.generation.load(Ordering::SeqCst);
     let app = app.clone();
     std::thread::spawn(move || {
         // People let go of the key on their last syllable; keep listening briefly.
@@ -113,8 +115,15 @@ fn on_release(app: &AppHandle) {
             None => samples,
         };
         pill(&app, "transcribing", None, None);
+        let waited = Instant::now();
+        let current = current_stt(&app, MODEL_WAIT);
+        let wait_ms = waited.elapsed().as_millis();
+        if wait_ms > 0 {
+            println!("[otto] waited {wait_ms} ms for the speech model to load");
+        }
+        // Only recognition counts toward the time the pill shows, not the model wait.
         let started = Instant::now();
-        let result = match current_stt(&app, MODEL_WAIT) {
+        let result = match current {
             Some(Ok(stt)) => device::transcribe_with_fallback(
                 &stt,
                 |reason| reload_on_cpu(&app, reason, stt.path()).map(|cpu| Box::new(cpu) as Box<dyn device::Transcriber>),
@@ -124,6 +133,15 @@ fn on_release(app: &AppHandle) {
             None => Err("Speech model is still loading".into()),
         };
         let ms = started.elapsed().as_millis();
+        // The user pressed again while this one waited or ran: the island now belongs to the
+        // newer recording, so this result still runs its task but leaves the pill alone.
+        let superseded = app.state::<Otto>().generation.load(Ordering::SeqCst) != generation;
+        let show = |p: Pill| {
+            if !superseded {
+                let _ = app.emit("otto://pill", p);
+            }
+        };
+        let miss = |text: Option<String>| show(Pill { state: "miss", text, ms: None, follow_up: false });
         match result {
             Ok(text) if is_speech(&text) => {
                 println!("[otto] heard in {ms} ms: {text}");
@@ -132,27 +150,26 @@ fn on_release(app: &AppHandle) {
                     .get_webview_window("onboarding")
                     .is_some_and(|w| w.is_visible().unwrap_or(false));
                 if practicing {
-                    pill(&app, "heard", Some(text), Some(ms));
-                    hide_later(&app);
-                    return;
-                }
-                match tasks::Tasks::submit(&app, &text) {
-                    Ok(s) => {
-                        let _ = app.emit("otto://pill", Pill { state: "heard", text: Some(s.title), ms: Some(ms), follow_up: s.follow_up });
-                    }
-                    Err(e) => {
-                        eprintln!("[otto] could not queue task: {e}");
-                        pill(&app, "miss", Some(e), None);
+                    show(Pill { state: "heard", text: Some(text), ms: Some(ms), follow_up: false });
+                } else {
+                    match tasks::Tasks::submit(&app, &text) {
+                        Ok(s) => show(Pill { state: "heard", text: Some(s.title), ms: Some(ms), follow_up: s.follow_up }),
+                        Err(e) => {
+                            eprintln!("[otto] could not queue task: {e}");
+                            miss(Some(e));
+                        }
                     }
                 }
             }
-            Ok(_) => pill(&app, "miss", None, None),
+            Ok(_) => miss(None),
             Err(e) => {
                 eprintln!("[otto] speech error: {e}");
-                pill(&app, "miss", Some(e), None);
+                miss(Some(e));
             }
         }
-        hide_later(&app);
+        if !superseded {
+            hide_later(&app);
+        }
     });
 }
 
@@ -201,11 +218,16 @@ fn on_screens_changed(app: &AppHandle) {
     // After sleep the GPU and caches are cold; warm the resident model now, off the UI thread,
     // so the first command after wake is as fast as any other. Skipped while it is still loading.
     if let Some(Ok(stt)) = current_stt(app, Duration::ZERO) {
+        let app = app.clone();
         std::thread::spawn(move || {
             let t = Instant::now();
-            match stt.warm_up() {
+            match stt.warm_up_raw() {
                 Ok(()) => println!("[otto] speech warm-up after wake: {} ms", t.elapsed().as_millis()),
-                Err(e) => eprintln!("[otto] {e}"),
+                // The GPU didn't survive sleep: move to the CPU now, not on the next command.
+                Err(e) if device::is_device_fault(e.kind()) && stt.device().kind != stt::DeviceKind::Cpu => {
+                    let _ = reload_on_cpu(&app, &format!("warm-up after wake failed: {e}"), stt.path());
+                }
+                Err(e) => eprintln!("[otto] speech model warm-up after wake failed: {e}"),
             }
         });
     }
@@ -336,7 +358,7 @@ pub fn run() {
                 demo(app.handle().clone());
             }
 
-            // The gate loads on its own thread so it never waits for the (slower) speech model.
+            // The silence gate (VAD) loads on its own thread so it never waits for the (slower) speech model.
             let vad_handle = app.handle().clone();
             std::thread::spawn(move || {
                 stt::init_backends();

@@ -27,20 +27,36 @@ pub fn candidates(pref: &DevicePref, all: &[DeviceInfo]) -> Vec<DeviceInfo> {
     out
 }
 
+/// Whether Auto races the GPU against the CPU. Windows PCs can have a weak iGPU or a broken
+/// driver, so the race guards them. A Mac has one GPU (Metal), which is the right choice there.
+const RACE_CPU_IN_AUTO: bool = !cfg!(target_os = "macos");
+
 /// Picks the device to run speech on.
-/// Auto: the CPU is timed first, then the first GPU candidate; the GPU is kept only when strictly
-/// faster (a tie keeps the CPU). Named: the named GPU is honoured without a race; it only has to
-/// load and run. Any GPU error gives the CPU. Nothing is timed when there's no GPU candidate.
-pub fn choose(pref: &DevicePref, all: &[DeviceInfo], mut time_warmup: impl FnMut(&DeviceInfo) -> Result<u128, String>) -> DeviceInfo {
+/// Auto on Windows/Linux: the CPU is timed first, then the first GPU candidate; the GPU is kept
+/// only when strictly faster (a tie keeps the CPU). Auto on macOS, and Named: the GPU is used
+/// without a race; it only has to load and run. Any GPU error gives the CPU. Nothing is timed
+/// when there's no GPU candidate.
+pub fn choose(pref: &DevicePref, all: &[DeviceInfo], time_warmup: impl FnMut(&DeviceInfo) -> Result<u128, String>) -> DeviceInfo {
+    choose_with(pref, all, RACE_CPU_IN_AUTO, time_warmup)
+}
+
+fn choose_with(
+    pref: &DevicePref,
+    all: &[DeviceInfo],
+    race_cpu_in_auto: bool,
+    mut time_warmup: impl FnMut(&DeviceInfo) -> Result<u128, String>,
+) -> DeviceInfo {
     let list = candidates(pref, all);
     let cpu = list.last().cloned().unwrap_or_else(DeviceInfo::cpu);
     let Some(gpu) = list.into_iter().find(|d| d.kind != DeviceKind::Cpu) else {
         return cpu;
     };
-    if matches!(pref, DevicePref::Named(_)) {
+    let race = race_cpu_in_auto && matches!(pref, DevicePref::Auto);
+    if !race {
         return match time_warmup(&gpu) {
             Ok(ms) => {
-                println!("[otto] speech device check: {} {ms} ms, using it (named in config)", gpu.name);
+                let why = if matches!(pref, DevicePref::Named(_)) { "named in config" } else { "the only GPU path here" };
+                println!("[otto] speech device check: {} {ms} ms, using it ({why})", gpu.name);
                 gpu
             }
             Err(e) => {
@@ -124,7 +140,7 @@ pub struct SpeechError {
 
 /// Only backend-class failures justify leaving the GPU; input problems (too short, too long,
 /// aborted, repetitive output) would fail on the CPU too.
-fn is_device_fault(kind: ErrorKind) -> bool {
+pub fn is_device_fault(kind: ErrorKind) -> bool {
     matches!(kind, ErrorKind::Backend | ErrorKind::OutOfMemory | ErrorKind::Other)
 }
 
@@ -167,7 +183,6 @@ pub fn transcribe_with_fallback(
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,6 +206,21 @@ mod tests {
         }
     }
 
+    /// `choose` as it runs on Windows and Linux (Auto races the CPU), on any build target.
+    fn race(pref: &DevicePref, all: &[DeviceInfo], t: impl FnMut(&DeviceInfo) -> Result<u128, String>) -> DeviceInfo {
+        choose_with(pref, all, true, t)
+    }
+
+    /// `choose` as it runs on macOS (Auto takes the GPU without a race).
+    fn mac(pref: &DevicePref, all: &[DeviceInfo], t: impl FnMut(&DeviceInfo) -> Result<u128, String>) -> DeviceInfo {
+        choose_with(pref, all, false, t)
+    }
+
+    #[test]
+    fn auto_races_cpu_off_macos_only() {
+        assert_eq!(RACE_CPU_IN_AUTO, !cfg!(target_os = "macos"));
+    }
+
     fn names(ds: &[DeviceInfo]) -> Vec<String> {
         ds.iter().map(|d| d.name.clone()).collect()
     }
@@ -205,7 +235,7 @@ mod tests {
     fn auto_drops_gpu_slower_than_cpu() {
         let asked = RefCell::new(vec![]);
         let table = [("RTX", Ok(900)), ("Core", Ok(400))];
-        assert_eq!(choose(&DevicePref::Auto, &[intel(), rtx(), cpu()], timer(&table, &asked)), cpu());
+        assert_eq!(race(&DevicePref::Auto, &[intel(), rtx(), cpu()], timer(&table, &asked)), cpu());
         // CPU first (so only one model is loaded at a time), then only the first GPU candidate.
         assert_eq!(*asked.borrow(), names(&[cpu(), rtx()]));
     }
@@ -214,7 +244,7 @@ mod tests {
     fn auto_keeps_faster_gpu() {
         let asked = RefCell::new(vec![]);
         let table = [("RTX", Ok(80)), ("Core", Ok(400))];
-        assert_eq!(choose(&DevicePref::Auto, &[intel(), rtx(), cpu()], timer(&table, &asked)), rtx());
+        assert_eq!(race(&DevicePref::Auto, &[intel(), rtx(), cpu()], timer(&table, &asked)), rtx());
         assert_eq!(*asked.borrow(), names(&[cpu(), rtx()]));
     }
 
@@ -222,20 +252,20 @@ mod tests {
     fn auto_tie_keeps_cpu() {
         let asked = RefCell::new(vec![]);
         let table = [("RTX", Ok(400)), ("Core", Ok(400))];
-        assert_eq!(choose(&DevicePref::Auto, &[rtx(), cpu()], timer(&table, &asked)), cpu());
+        assert_eq!(race(&DevicePref::Auto, &[rtx(), cpu()], timer(&table, &asked)), cpu());
     }
 
     #[test]
     fn auto_falls_back_to_cpu_when_no_gpu_listed() {
         let asked = RefCell::new(vec![]);
-        assert_eq!(choose(&DevicePref::Auto, &[cpu()], timer(&[], &asked)), cpu());
+        assert_eq!(race(&DevicePref::Auto, &[cpu()], timer(&[], &asked)), cpu());
         assert!(asked.borrow().is_empty(), "{:?}", asked.borrow());
     }
 
     #[test]
     fn auto_with_nothing_listed_gives_cpu() {
         let asked = RefCell::new(vec![]);
-        assert_eq!(choose(&DevicePref::Auto, &[], timer(&[], &asked)).kind, DeviceKind::Cpu);
+        assert_eq!(race(&DevicePref::Auto, &[], timer(&[], &asked)).kind, DeviceKind::Cpu);
         assert!(asked.borrow().is_empty());
     }
 
@@ -243,14 +273,14 @@ mod tests {
     fn gpu_warmup_error_gives_cpu() {
         let asked = RefCell::new(vec![]);
         let table = [("RTX", Err("vulkan backend requested but not available".to_string())), ("Core", Ok(400))];
-        assert_eq!(choose(&DevicePref::Auto, &[rtx(), cpu()], timer(&table, &asked)), cpu());
+        assert_eq!(race(&DevicePref::Auto, &[rtx(), cpu()], timer(&table, &asked)), cpu());
     }
 
     #[test]
     fn cpu_check_error_keeps_working_gpu() {
         let asked = RefCell::new(vec![]);
         let table = [("RTX", Ok(900)), ("Core", Err("cpu failed".to_string()))];
-        assert_eq!(choose(&DevicePref::Auto, &[rtx(), cpu()], timer(&table, &asked)), rtx());
+        assert_eq!(race(&DevicePref::Auto, &[rtx(), cpu()], timer(&table, &asked)), rtx());
     }
 
     #[test]
@@ -259,7 +289,7 @@ mod tests {
         let table = [("RTX", Ok(80)), ("Core", Ok(400))];
         let pref = DevicePref::Named("Radeon".into());
         assert_eq!(candidates(&pref, &[rtx(), cpu()]), vec![cpu()]);
-        assert_eq!(choose(&pref, &[rtx(), cpu()], timer(&table, &asked)), cpu());
+        assert_eq!(race(&pref, &[rtx(), cpu()], timer(&table, &asked)), cpu());
         assert!(asked.borrow().is_empty(), "{:?}", asked.borrow());
     }
 
@@ -271,7 +301,7 @@ mod tests {
         // "intel" also appears in the CPU's name; only GPUs match a name.
         let pref = DevicePref::Named("intel".into());
         assert_eq!(candidates(&pref, &[rtx(), intel(), cpu()]), vec![intel(), cpu()]);
-        assert_eq!(choose(&pref, &[rtx(), intel(), cpu()], timer(&table, &asked)), intel());
+        assert_eq!(race(&pref, &[rtx(), intel(), cpu()], timer(&table, &asked)), intel());
         assert_eq!(*asked.borrow(), names(&[intel()]));
     }
 
@@ -280,7 +310,7 @@ mod tests {
         let asked = RefCell::new(vec![]);
         let table = [("UHD", Err("warm-up failed".to_string())), ("Core", Ok(100))];
         let pref = DevicePref::Named("UHD".into());
-        assert_eq!(choose(&pref, &[intel(), cpu()], timer(&table, &asked)), cpu());
+        assert_eq!(race(&pref, &[intel(), cpu()], timer(&table, &asked)), cpu());
     }
 
     #[test]
@@ -288,19 +318,38 @@ mod tests {
         let asked = RefCell::new(vec![]);
         let table = [("RTX", Ok(1)), ("Core", Ok(400))];
         assert_eq!(candidates(&DevicePref::Cpu, &[intel(), rtx(), cpu()]), vec![cpu()]);
-        assert_eq!(choose(&DevicePref::Cpu, &[intel(), rtx(), cpu()], timer(&table, &asked)), cpu());
+        assert_eq!(race(&DevicePref::Cpu, &[intel(), rtx(), cpu()], timer(&table, &asked)), cpu());
         assert!(asked.borrow().is_empty(), "{:?}", asked.borrow());
     }
 
     /// Apple Silicon: one Metal GPU (unified memory, may be listed as integrated) and the CPU.
+    /// Auto takes Metal without timing the CPU, even if the CPU would have won the race.
     #[test]
-    fn mac_lone_integrated_gpu_is_timed_and_kept_when_faster() {
+    fn mac_auto_takes_lone_integrated_gpu_without_race() {
         let metal = DeviceInfo::fake("Apple M2", DeviceKind::Integrated);
         let mac_cpu = DeviceInfo::fake("CPU", DeviceKind::Cpu);
         let asked = RefCell::new(vec![]);
-        let table = [("Apple", Ok(60)), ("CPU", Ok(500))];
-        assert_eq!(choose(&DevicePref::Auto, &[metal.clone(), mac_cpu], timer(&table, &asked)), metal);
-        assert_eq!(*asked.borrow(), vec!["CPU".to_string(), "Apple M2".to_string()]);
+        let table = [("Apple", Ok(600)), ("CPU", Ok(500))];
+        assert_eq!(mac(&DevicePref::Auto, &[metal.clone(), mac_cpu], timer(&table, &asked)), metal);
+        assert_eq!(*asked.borrow(), vec!["Apple M2".to_string()]);
+    }
+
+    #[test]
+    fn mac_auto_metal_error_gives_cpu() {
+        let metal = DeviceInfo::fake("Apple M2", DeviceKind::Discrete);
+        let mac_cpu = DeviceInfo::fake("CPU", DeviceKind::Cpu);
+        let asked = RefCell::new(vec![]);
+        let table = [("Apple", Err("metal warm-up failed".to_string())), ("CPU", Ok(500))];
+        assert_eq!(mac(&DevicePref::Auto, &[metal, mac_cpu.clone()], timer(&table, &asked)), mac_cpu);
+    }
+
+    #[test]
+    fn mac_cpu_pref_still_cpu() {
+        let metal = DeviceInfo::fake("Apple M2", DeviceKind::Integrated);
+        let mac_cpu = DeviceInfo::fake("CPU", DeviceKind::Cpu);
+        let asked = RefCell::new(vec![]);
+        assert_eq!(mac(&DevicePref::Cpu, &[metal, mac_cpu.clone()], timer(&[], &asked)), mac_cpu);
+        assert!(asked.borrow().is_empty());
     }
 
     #[test]
