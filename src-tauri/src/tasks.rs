@@ -345,6 +345,8 @@ const TOOLS: &str = "Read,Write,Edit,Glob,Grep,Bash,WebSearch,WebFetch,TodoWrite
 /// - "ask_memory": true makes every memory save ask first (default: automatic). Set from the setup window.
 /// - "check_updates": false stops the daily check for a newer Otto on GitHub.
 /// - "model": "sonnet" Claude model for tasks (default: your Claude Code default). Faster models answer sooner.
+/// - "speech_model": speech-to-text model file name (default: the Parakeet 0.6B GGUF; "ggml-base.en.bin" switches back to Whisper).
+/// - "speech_device": "auto" (default), "cpu", or a device name substring such as "RTX".
 pub(crate) fn config() -> Value {
     std::fs::read(otto_dir().join("config.json"))
         .ok()

@@ -5,6 +5,7 @@ mod onboarding;
 mod overlay;
 mod platform;
 mod power;
+mod speech_config;
 mod stt;
 mod tasks;
 mod tray;
