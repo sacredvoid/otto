@@ -39,7 +39,7 @@ Otto's current Windows build runs base.en at p50 10135 ms and p95 11589 ms. The 
 
 ## No-GPU check
 
-A copy of the `tc` runner without `ggml-vulkan.dll` ran 10 clips. The NVIDIA device was "device 'nvidia' not found, skipping" and CPU transcription worked.
+A copy of the `tc` runner without `ggml-vulkan.dll` ran 10 clips. The runner logged "device 'nvidia' not found, skipping" and transcribed on CPU.
 
 | model | device | raw hit % | mean WER | p50 ms | p95 ms | silence clips with text | peak MB |
 |---|---|---|---|---|---|---|---|
@@ -76,6 +76,6 @@ Otto appears in 11 of the 40 commands, so a vocabulary or prompt bias for "Otto"
 
 - 40 spoken commands from one speaker on one laptop. Results do not cover other voices, accents or microphones.
 - All clips are real recordings of the scripted text, with no synthetic speech.
-- Cold start: the table shows warm numbers. The first GPU use after install compiles shaders, and later runs use the cache. A Task 6 smoke run on a fresh driver cache measured 13.4 s for the 0.6B model's first GPU run on the RTX 4060; this run's cache was already warm (first_run_ms.csv: 95 ms first run, 873 ms load). The CPU path has no shader compile (0.6B first run 415 ms, load 388 ms).
-- The adjusted score trusts a readable number in the right slot. For base.en time02 ("Who's the standard to 10?") the rule counts a hit although the sentence is wrong. The same applies to base.en time08 ("Schedule the renews for 230 tomorrow."), flipped despite a wrong word. Without the time02 and time08 flips the optimized base.en adjusted score is 57.5.
+- Cold start: the table shows warm numbers. The first GPU use after install compiles shaders, and later runs use the cache. A Task 6 smoke run on a fresh driver cache measured 13.4 s for the 0.6B model's first GPU run on the RTX 4060; this run started with a warm cache (first_run_ms.csv: 95 ms first run, 873 ms load). The CPU path has no shader compile (0.6B first run 415 ms, load 388 ms).
+- The adjusted score trusts a readable number in the right slot. For base.en time02 ("Who's the standard to 10?") the rule counts a hit although the sentence is wrong. The adjustment rule also counts base.en time08 ("Schedule the renews for 230 tomorrow.") as a hit even though it has a wrong word; without the time02 and time08 adjustments the optimized base.en adjusted score is 57.5.
 - Peak memory for the 0.6B model on CPU is 1115 MB, about three times the base.en peak of 343 MB.
