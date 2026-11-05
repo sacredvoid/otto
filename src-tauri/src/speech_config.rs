@@ -31,7 +31,6 @@ pub fn from_config(v: &Value) -> SpeechConfig {
     SpeechConfig { model, device }
 }
 
-#[allow(dead_code)]
 pub fn load() -> SpeechConfig {
     from_config(&crate::tasks::config())
 }

@@ -5,6 +5,7 @@
   },
   "bundle": {
     "targets": ["nsis"],
+    "resources": { "transcribe-libs/*.dll": "./" },
     "windows": {
       "nsis": { "installMode": "currentUser" }
     }

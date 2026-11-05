@@ -268,9 +268,16 @@ pub fn run() {
 
             let handle = app.handle().clone();
             std::thread::spawn(move || {
-                let loaded = stt::Stt::load(&stt::default_model_path());
+                stt::init_backends();
+                let config = speech_config::load();
+                // CPU for now; GPU selection and fallback come with the speech_device setting.
+                let device = stt::devices()
+                    .into_iter()
+                    .find(|d| d.kind == stt::DeviceKind::Cpu)
+                    .unwrap_or_else(stt::DeviceInfo::cpu);
+                let loaded = stt::Stt::load(&stt::model_path(&config.model), &device);
                 match &loaded {
-                    Ok(_) => println!("[otto] speech model ready"),
+                    Ok(stt) => println!("[otto] speech model ready: {} on {}", config.model, stt.device().name),
                     Err(e) => eprintln!("[otto] {e}"),
                 }
                 let _ = handle.state::<Otto>().stt.set(loaded);

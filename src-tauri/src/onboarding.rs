@@ -89,7 +89,7 @@ pub fn onboarding_info() -> Info {
     let list = |k: &str| -> Vec<String> {
         config[k].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect()).unwrap_or_default()
     };
-    Info { model_ready: crate::stt::default_model_path().is_file(), folders, disabled: list("disabled"), plugins: list("plugins"), ask_memory: config["ask_memory"] == true }
+    Info { model_ready: crate::stt::model_path(&crate::speech_config::load().model).is_file(), folders, disabled: list("disabled"), plugins: list("plugins"), ask_memory: config["ask_memory"] == true }
 }
 
 #[derive(Serialize)]
