@@ -48,13 +48,23 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Cache speech model
+      # The Windows speech engine builds its Vulkan GPU backend, which needs the SDK's
+      # headers and shader compiler. Installed users don't need it: without a Vulkan
+      # driver Otto runs speech on the CPU.
+      - name: Install the Vulkan SDK
+        if: runner.os == 'Windows'
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.4.309.0
+          cache: true
+
+      - name: Cache speech models
         uses: actions/cache@v4
         with:
           path: models
-          key: whisper-ggml-base.en
+          key: parakeet-tdt-0.6b-v2-q8_0+silero-vad-v6.2
 
-      - name: Fetch speech model
+      - name: Fetch speech models
         run: sh scripts/fetch-model.sh
 
       - run: npm ci
@@ -81,6 +91,19 @@ jobs:
           name: Otto-${{ matrix.os }}-${{ github.sha }}
           path: ${{ matrix.bundle }}
           retention-days: 14
+
+  # The speech benchmark (bench/) is a dev tool; this keeps it compiling with Metal so
+  # it can run on a Mac. The Windows build runs it by hand (see bench/RESULTS.md).
+  bench:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: bench
+      - name: Build the speech benchmark
+        run: cargo build --release --manifest-path bench/Cargo.toml
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
