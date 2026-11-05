@@ -33,10 +33,20 @@ fn pick_device(want: &str) -> Option<(Backend, Option<Device>)> {
     if want == "cpu" {
         return all.iter().find(|d| d.kind == "cpu").map(|_| (Backend::Cpu, None));
     }
+    // The backend comes from the enumerated device's kind (metal on macOS, vulkan on Windows).
     all.into_iter()
         .filter(|d| d.kind != "cpu")
         .find(|d| d.description.to_lowercase().contains(&want) || d.name.to_lowercase().contains(&want))
-        .map(|d| (Backend::Vulkan, Some(d)))
+        .and_then(|d| {
+            let b = match d.kind.as_str() {
+                "metal" => Backend::Metal,
+                "vulkan" => Backend::Vulkan,
+                "cuda" => Backend::Cuda,
+                "rocm" => Backend::Rocm,
+                _ => return None,
+            };
+            Some((b, Some(d)))
+        })
 }
 
 fn transcribe(session: &mut transcribe_cpp::Session, pcm: &[f32]) -> Result<String, String> {
@@ -150,7 +160,24 @@ fn run() -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let tmp = std::env::temp_dir();
     let commands = load_commands(Path::new(tsv))?;
+    let missing: Vec<&str> = commands
+        .iter()
+        .filter(|c| !Path::new(clips).join(format!("{}.wav", c.id)).is_file())
+        .map(|c| c.id.as_str())
+        .collect();
+    if !missing.is_empty() {
+        eprintln!(
+            "WARNING: {} of {} clips are MISSING in {} and will be skipped: {}",
+            missing.len(),
+            commands.len(),
+            clips,
+            missing.join(" ")
+        );
+    }
 
+    let mut failed: Vec<String> = Vec::new();
+    let mut no_device = 0usize;
+    let mut completed = 0usize;
     let mut rows: Vec<Row> = Vec::new();
     let mut mem: Vec<(String, String, u64)> = Vec::new();
     let mut first_runs = String::from("model,device,backend,load_ms,first_run_ms,skipped\n");
@@ -172,16 +199,27 @@ fn run() -> Result<(), String> {
                 Some(0) => {}
                 Some(EXIT_NO_DEVICE) => {
                     eprintln!("warning: no '{dev}' device, skipped {}", m.display());
+                    no_device += 1;
                     continue;
                 }
                 _ => {
-                    eprintln!("warning: {} on {dev} failed ({status}), skipped", m.display());
+                    eprintln!("ERROR: {} on {dev} failed ({status})", m.display());
+                    failed.push(format!("{} x {dev} ({status})", m.display()));
                     continue;
                 }
             }
-            let v: serde_json::Value =
-                serde_json::from_slice(&std::fs::read(&out_json).map_err(|e| e.to_string())?)
-                    .map_err(|e| e.to_string())?;
+            let parsed = std::fs::read(&out_json)
+                .map_err(|e| e.to_string())
+                .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).map_err(|e| e.to_string()));
+            let v = match parsed {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("ERROR: {} on {dev}: no usable result ({e})", m.display());
+                    failed.push(format!("{} x {dev} (no result: {e})", m.display()));
+                    continue;
+                }
+            };
+            completed += 1;
             let label = v["label"].as_str().unwrap_or("").to_string();
             println!(
                 "== {label} / {dev} ({}): load {} ms, first_run {} ms, peak {} MB, {} skipped",
@@ -213,8 +251,22 @@ fn run() -> Result<(), String> {
         }
     }
     write_reports(&rows, &mem, out)?;
+    first_runs.push_str(&format!("# missing clips: {} {}\n", missing.len(), missing.join(" ")));
     std::fs::write(out.join("first_run_ms.csv"), first_runs).map_err(|e| e.to_string())?;
-    println!("done: {} rows -> {}", rows.len(), out.display());
+    let total = models.len() * devs.split(',').map(str::trim).filter(|d| !d.is_empty()).count();
+    println!(
+        "done: {} rows -> {}; combinations: {completed} completed + {no_device} skipped (no device) + {} failed = {total}; {} clips missing",
+        rows.len(),
+        out.display(),
+        failed.len(),
+        missing.len()
+    );
+    if completed + no_device + failed.len() != total {
+        return Err(format!("combination accounting mismatch: expected {total}"));
+    }
+    if !failed.is_empty() {
+        return Err(format!("{} combination(s) FAILED: {}", failed.len(), failed.join("; ")));
+    }
     Ok(())
 }
 
