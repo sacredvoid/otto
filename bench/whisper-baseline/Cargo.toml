@@ -1,0 +1,14 @@
+[package]
+name = "whisper-baseline"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+stt_bench_common = { path = "../common" }
+
+# Same version/feature gating as src-tauri/Cargo.toml.
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+whisper-rs = "0.16"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { version = "0.16", features = ["metal"] }

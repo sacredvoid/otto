@@ -38,16 +38,21 @@ strip = true
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
 
-# Speech runs on the GPU through Metal on a Mac, on the CPU elsewhere.
-[target.'cfg(not(target_os = "macos"))'.dependencies]
-whisper-rs = "0.16"
+# Speech (Parakeet / Whisper GGUF) runs through transcribe-cpp. Windows x64 loads the
+# GPU backends (Vulkan) at runtime from DLLs staged by build.rs, so a PC without a Vulkan
+# driver still starts and runs on the CPU. Macs use static Metal; other targets CPU only.
+[target.'cfg(all(windows, target_arch = "x86_64"))'.dependencies]
+transcribe-cpp = { version = "0.4", default-features = false, features = ["dynamic-backends", "vulkan"] }
+
+[target.'cfg(not(any(all(windows, target_arch = "x86_64"), target_os = "macos")))'.dependencies]
+transcribe-cpp = { version = "0.4", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 tauri-plugin-single-instance = "2"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-whisper-rs = { version = "0.16", features = ["metal"] }
+transcribe-cpp = { version = "0.4", default-features = false, features = ["metal"] }
 objc2 = "0.6"
 block2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry", "NSString"] }

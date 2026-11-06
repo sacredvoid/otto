@@ -73,7 +73,11 @@
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
-    "resources": { "../models/ggml-base.en.bin": "models/ggml-base.en.bin" },
+    "resources": {
+      "../models/parakeet-tdt-0.6b-v2-Q8_0.gguf": "models/parakeet-tdt-0.6b-v2-Q8_0.gguf",
+      "../models/silero-vad-v6.2-F32.gguf": "models/silero-vad-v6.2-F32.gguf",
+      "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
+    },
     "macOS": { "minimumSystemVersion": "13.0", "signingIdentity": "-", "entitlements": "Entitlements.plist" },
     "icon": [
       "icons/32x32.png",

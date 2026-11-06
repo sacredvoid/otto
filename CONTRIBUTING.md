@@ -8,7 +8,7 @@ You need macOS on Apple Silicon, [Rust](https://rustup.rs), Node 20+, and [Claud
 
 ```bash
 git clone https://github.com/sacredvoid/otto.git && cd otto
-npm install          # also downloads the speech model (~148 MB, once)
+npm install          # also downloads the speech models (~730 MB, once)
 npm run tauri dev    # hold Ctrl + Option + Space to talk
 ```
 

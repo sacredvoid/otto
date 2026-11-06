@@ -1,17 +1,20 @@
 mod audio;
+mod device;
 mod gate;
 mod history;
 mod onboarding;
 mod overlay;
 mod platform;
 mod power;
+mod speech_config;
 mod stt;
 mod tasks;
 mod tray;
 mod updates;
+mod vad;
 
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -21,12 +24,24 @@ use tauri_plugin_global_shortcut::ShortcutState;
 const HOTKEY: &str = "ctrl+alt+space";
 /// Shorter than this is an accidental tap, not speech.
 const MIN_SAMPLES: usize = stt::SAMPLE_RATE as usize * 3 / 10;
+/// Bundled Silero VAD model (see vad.rs).
+const VAD_MODEL: &str = "silero-vad-v6.2-F32.gguf";
 const RELEASE_TAIL: Duration = Duration::from_millis(300);
+/// How long a hotkey release waits for the speech model while it is still loading at startup
+/// (the GPU check takes ~3 s, up to ~13 s on a cold driver cache).
+const MODEL_WAIT: Duration = Duration::from_secs(20);
 
 #[derive(Default)]
 struct Otto {
     recording: Mutex<Option<audio::Recording>>,
-    stt: OnceLock<Result<stt::Stt, String>>,
+    /// None while the model loads. Shared via Arc so the lock is only held to clone or swap the
+    /// value, never during a transcription; `stt_ready` is signalled when loading finishes.
+    stt: Mutex<Option<Result<Arc<stt::Stt>, String>>>,
+    stt_ready: Condvar,
+    /// Set once at startup: Some when the VAD model loaded, None when it could not (no gating).
+    vad: std::sync::OnceLock<Option<vad::Vad>>,
+    /// Serializes moves to the CPU so two failing utterances don't both reload.
+    reloading: Mutex<()>,
     /// Bumped on every hotkey press so a stale "hide" timer can't close a newer pill.
     generation: AtomicU64,
 }
@@ -73,6 +88,8 @@ fn on_release(app: &AppHandle) {
     let Some(recording) = otto.recording.lock().unwrap().take() else {
         return;
     };
+    // A newer press bumps this; a slow result (model still loading) must not overwrite its pill.
+    let generation = otto.generation.load(Ordering::SeqCst);
     let app = app.clone();
     std::thread::spawn(move || {
         // People let go of the key on their last syllable; keep listening briefly.
@@ -83,14 +100,48 @@ fn on_release(app: &AppHandle) {
             hide_later(&app);
             return;
         }
+        // Silent taps and key-clicks never reach the recognizer. No gate (not loaded yet, or it
+        // failed to load): transcribe everything.
+        let samples = match app.state::<Otto>().vad.get().and_then(|v| v.as_ref()) {
+            Some(vad) => match vad.speech(&samples) {
+                Some(trimmed) => trimmed,
+                None => {
+                    println!("[otto] no speech in the clip, skipping transcription");
+                    pill(&app, "miss", None, None);
+                    hide_later(&app);
+                    return;
+                }
+            },
+            None => samples,
+        };
         pill(&app, "transcribing", None, None);
+        let waited = Instant::now();
+        let current = current_stt(&app, MODEL_WAIT);
+        let wait_ms = waited.elapsed().as_millis();
+        if wait_ms > 0 {
+            println!("[otto] waited {wait_ms} ms for the speech model to load");
+        }
+        // Only recognition counts toward the time the pill shows, not the model wait.
         let started = Instant::now();
-        let result = match app.state::<Otto>().stt.get() {
-            Some(Ok(stt)) => stt.transcribe(&samples),
-            Some(Err(e)) => Err(e.clone()),
+        let result = match current {
+            Some(Ok(stt)) => device::transcribe_with_fallback(
+                &stt,
+                |reason| reload_on_cpu(&app, reason, stt.path()).map(|cpu| Box::new(cpu) as Box<dyn device::Transcriber>),
+                &samples,
+            ),
+            Some(Err(e)) => Err(e),
             None => Err("Speech model is still loading".into()),
         };
         let ms = started.elapsed().as_millis();
+        // The user pressed again while this one waited or ran: the island now belongs to the
+        // newer recording, so this result still runs its task but leaves the pill alone.
+        let superseded = app.state::<Otto>().generation.load(Ordering::SeqCst) != generation;
+        let show = |p: Pill| {
+            if !superseded {
+                let _ = app.emit("otto://pill", p);
+            }
+        };
+        let miss = |text: Option<String>| show(Pill { state: "miss", text, ms: None, follow_up: false });
         match result {
             Ok(text) if is_speech(&text) => {
                 println!("[otto] heard in {ms} ms: {text}");
@@ -99,28 +150,54 @@ fn on_release(app: &AppHandle) {
                     .get_webview_window("onboarding")
                     .is_some_and(|w| w.is_visible().unwrap_or(false));
                 if practicing {
-                    pill(&app, "heard", Some(text), Some(ms));
-                    hide_later(&app);
-                    return;
-                }
-                match tasks::Tasks::submit(&app, &text) {
-                    Ok(s) => {
-                        let _ = app.emit("otto://pill", Pill { state: "heard", text: Some(s.title), ms: Some(ms), follow_up: s.follow_up });
-                    }
-                    Err(e) => {
-                        eprintln!("[otto] could not queue task: {e}");
-                        pill(&app, "miss", Some(e), None);
+                    show(Pill { state: "heard", text: Some(text), ms: Some(ms), follow_up: false });
+                } else {
+                    match tasks::Tasks::submit(&app, &text) {
+                        Ok(s) => show(Pill { state: "heard", text: Some(s.title), ms: Some(ms), follow_up: s.follow_up }),
+                        Err(e) => {
+                            eprintln!("[otto] could not queue task: {e}");
+                            miss(Some(e));
+                        }
                     }
                 }
             }
-            Ok(_) => pill(&app, "miss", None, None),
+            Ok(_) => miss(None),
             Err(e) => {
                 eprintln!("[otto] speech error: {e}");
-                pill(&app, "miss", Some(e), None);
+                miss(Some(e));
             }
         }
-        hide_later(&app);
+        if !superseded {
+            hide_later(&app);
+        }
     });
+}
+
+/// The loaded model, waiting up to `limit` while startup is still loading it (None if it isn't
+/// ready by then). The lock is held only to clone the Arc.
+fn current_stt(app: &AppHandle, limit: Duration) -> Option<Result<Arc<stt::Stt>, String>> {
+    let otto = app.state::<Otto>();
+    let guard = otto.stt.lock().unwrap_or_else(|p| p.into_inner());
+    let (guard, _) = otto.stt_ready.wait_timeout_while(guard, limit, |s| s.is_none()).unwrap_or_else(|p| p.into_inner());
+    guard.clone()
+}
+
+/// The GPU failed mid-session: load the same model file on the CPU and keep it there until
+/// restart. If the CPU load fails, the GPU model stays in place and only this utterance fails.
+fn reload_on_cpu(app: &AppHandle, reason: &str, path: &std::path::Path) -> Result<Arc<stt::Stt>, String> {
+    let otto = app.state::<Otto>();
+    let _one_at_a_time = otto.reloading.lock().unwrap_or_else(|p| p.into_inner());
+    // Another utterance may have already moved speech while this one waited.
+    if let Some(Ok(stt)) = otto.stt.lock().unwrap_or_else(|p| p.into_inner()).as_ref() {
+        if stt.device().kind == stt::DeviceKind::Cpu {
+            return Ok(stt.clone());
+        }
+    }
+    println!("[otto] speech moved to CPU: {reason}");
+    let cpu = stt::devices().into_iter().find(|d| d.kind == stt::DeviceKind::Cpu).unwrap_or_else(stt::DeviceInfo::cpu);
+    let loaded = stt::Stt::load(path, &cpu).map(Arc::new).inspect_err(|e| eprintln!("[otto] CPU reload failed, staying on the GPU: {e}"))?;
+    *otto.stt.lock().unwrap_or_else(|p| p.into_inner()) = Some(Ok(loaded.clone()));
+    Ok(loaded)
 }
 
 /// The Mac is going to sleep: drop any half-spoken request and put the island away.
@@ -138,6 +215,22 @@ fn on_sleep(app: &AppHandle) {
 fn on_screens_changed(app: &AppHandle) {
     overlay::place(app);
     overlay::place_toasts(app);
+    // After sleep the GPU and caches are cold; warm the resident model now, off the UI thread,
+    // so the first command after wake is as fast as any other. Skipped while it is still loading.
+    if let Some(Ok(stt)) = current_stt(app, Duration::ZERO) {
+        let app = app.clone();
+        std::thread::spawn(move || {
+            let t = Instant::now();
+            match stt.warm_up_raw() {
+                Ok(()) => println!("[otto] speech warm-up after wake: {} ms", t.elapsed().as_millis()),
+                // The GPU didn't survive sleep: move to the CPU now, not on the next command.
+                Err(e) if device::is_device_fault(e.kind()) && stt.device().kind != stt::DeviceKind::Cpu => {
+                    let _ = reload_on_cpu(&app, &format!("warm-up after wake failed: {e}"), stt.path());
+                }
+                Err(e) => eprintln!("[otto] speech model warm-up after wake failed: {e}"),
+            }
+        });
+    }
 }
 
 /// Whisper renders silence as tags like "[BLANK_AUDIO]" or "(wind blowing)".
@@ -265,14 +358,28 @@ pub fn run() {
                 demo(app.handle().clone());
             }
 
+            // The silence gate (VAD) loads on its own thread so it never waits for the (slower) speech model.
+            let vad_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                stt::init_backends();
+                let loaded = vad::Vad::load(&stt::model_path(VAD_MODEL))
+                    .inspect_err(|e| eprintln!("[otto] {e}; transcribing every clip without a silence gate"))
+                    .ok();
+                let _ = vad_handle.state::<Otto>().vad.set(loaded);
+            });
             let handle = app.handle().clone();
             std::thread::spawn(move || {
-                let loaded = stt::Stt::load(&stt::default_model_path());
+                stt::init_backends();
+                let config = speech_config::load();
+                // Times the best GPU against the CPU (seconds); a hotkey release meanwhile waits for it.
+                let loaded = device::load_best(&stt::model_path(&config.model), &config.device, &stt::devices());
                 match &loaded {
-                    Ok(_) => println!("[otto] speech model ready"),
+                    Ok(stt) => println!("[otto] speech model ready: {} on {}", config.model, stt.device().name),
                     Err(e) => eprintln!("[otto] {e}"),
                 }
-                let _ = handle.state::<Otto>().stt.set(loaded);
+                let otto = handle.state::<Otto>();
+                *otto.stt.lock().unwrap_or_else(|p| p.into_inner()) = Some(loaded.map(Arc::new));
+                otto.stt_ready.notify_all();
             });
             if !onboarding::is_onboarded() {
                 onboarding::show_onboarding(app.handle());

@@ -26,5 +26,10 @@ dist-ssr
 # Agent worktrees
 .claude/worktrees/
 
-# Speech model, fetched at build time
+# Speech models, fetched at build time (scripts/fetch-model.sh)
 models/
+*.gguf
+ggml-*.bin
+# transcribe-cpp DLLs staged by build.rs
+bench/tc/transcribe-libs/
+src-tauri/transcribe-libs/
